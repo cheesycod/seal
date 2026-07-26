@@ -99,37 +99,37 @@ declare extern type interrupt with
     code: "CtrlC" | "CtrlD"
 end
 
-type ArchiveFile = {
-    type: "File",
-    path: string,
-    content: string,
-    --- Unix permission bits (unix_mode, like `0o755`) if present
-    mode: number?,
-    --- Last modified time
-    mtime: DateTime?,
-}
-type ArchiveDirectory = {
-    type: "Directory",
-    path: string,
-    --- Unix permission bits (unix_mode, like `0o755`) if present
-    mode: number?,
-    --- Last modified time
-    mtime: DateTime?,
-}
-type ArchiveSymlink = {
-    type: "Symlink",
-    path: string,
-    target: string,
-    --- Unix permission bits (unix_mode, like `0o755`) if present
-    mode: number?,
-    --- Last modified time if present
-    mtime: DateTime?,
-}
+-- type ArchiveFile = {
+--     type: "File",
+--     path: string,
+--     content: string,
+--     --- Unix permission bits (unix_mode, like `0o755`) if present
+--     mode: number?,
+--     --- Last modified time
+--     mtime: DateTime?,
+-- }
+-- type ArchiveDirectory = {
+--     type: "Directory",
+--     path: string,
+--     --- Unix permission bits (unix_mode, like `0o755`) if present
+--     mode: number?,
+--     --- Last modified time
+--     mtime: DateTime?,
+-- }
+-- type ArchiveSymlink = {
+--     type: "Symlink",
+--     path: string,
+--     target: string,
+--     --- Unix permission bits (unix_mode, like `0o755`) if present
+--     mode: number?,
+--     --- Last modified time if present
+--     mtime: DateTime?,
+-- }
 
-type ArchiveEntry =
-    | ArchiveFile
-    | ArchiveDirectory
-    | ArchiveSymlink
+-- type ArchiveEntry =
+--     | ArchiveFile
+--     | ArchiveDirectory
+--     | ArchiveSymlink
 
 --[=[
     Info about a specific ArchiveEntry without the entry's contents.
@@ -178,6 +178,44 @@ type ArchiveOptions = {
     allow_unsafe_path_traversals: boolean?,
 }
 
+declare extern type ArchiveEntry with
+    type: "File" | "Directory" | "Symlink"
+    function path(self): string
+    function set_path(self): ()
+    function modified(self): DateTime?
+    function set_modified(self, dt: DateTime): ()
+    function unix_mode(self): number?
+    function set_unix_mode(self, mode: number): ()
+    function size(self): FileSize?
+
+    function as_file(self): ArchiveEntryFile?
+    function expect_file(self): ArchiveEntryFile
+
+    function as_directory(self): ArchiveEntryDirectory?
+    function expect_directory(self): ArchiveEntryDirectory
+
+    function as_symlink(self): ArchiveEntrySymlink?
+    function expect_symlink(self): ArchiveEntrySymlink
+end
+
+declare extern type ArchiveEntryFile extends ArchiveEntry with
+    type: "File"
+    function contents(self): string
+    function replace_contents(self, contents: string | buffer): ()
+    function size(self): FileSize
+    function compress(self, format: SingleFileFormat): buffer
+end
+
+declare extern type ArchiveEntryDirectory extends ArchiveEntry with
+    type: "Directory"
+end
+
+declare extern type ArchiveEntrySymlink extends ArchiveEntry with
+    type: "Symlink"
+    function target(self): string
+    function set_target(self, target: string): ()
+end
+
 --[=[
     Represents any compressed archive (tar.gz, zip file, 7z, debian packages/etc.)
 
@@ -206,12 +244,14 @@ declare extern type Archive with
     function info(self, path_or_index: string | number): ArchiveEntryInfo?
     --[=[
         Adds a single `ArchiveEntry` table to an existing archive in place with similar semantics to `table.insert`.
+        You can pass paths to existing files on disk instead of constructing ArchiveEntry tables.
     ]=]
-    function insert(self, index: number, entry: ArchiveEntry)
+    function insert(self, index: number, entry: ArchiveEntry | string)
     --[=[
         Adds one or more entries to the back of an archive.
+        You can pass paths to existing files on disk instead of constructing ArchiveEntry tables.
     ]=]
-    function append(self, entry: ArchiveEntry, ...: ArchiveEntry)
+    function append(self, entry: ArchiveEntry | string, ...: ArchiveEntry | string)
     --[=[
         Removes the `ArchiveEntry` element by index, shuffling all remaining entries to the front.
 

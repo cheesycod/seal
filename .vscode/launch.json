@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Debug executable 'seal'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=seal",
+                    "--package=seal"
+                ]
+            },
+            "args": ["/home/deviaze/Repositories/seal/tests/luau/std/archive/archive.luau"]
+        }
+    
+    ],
+}

@@ -121,7 +121,7 @@ impl HttpResponse {
         match content_type_table.raw_get("mime_type")? {
             LuaValue::String(mime_type) => {
                 match mime_type.to_str() {
-                    Ok(mime_type) if mime_type.as_str() == "application/json" => {
+                    Ok(mime_type) if (&*mime_type) == "application/json" => {
                         Ok(IsJson::Yes)
                     },
                     Ok(other_mime_type) => {

@@ -32,7 +32,7 @@ pub fn get_path_from_entry(entry: &LuaValue, function_name: &str) -> LuaResult<S
     }
 }
 
-pub fn wrap_io_read_errors<P: AsRef<Path>>(err: std::io::Error, function_name: &str, path: P) -> LuaValueResult {
+pub fn wrap_io_read_errors<P: AsRef<Path>, T>(err: std::io::Error, function_name: &str, path: P) -> LuaResult<T> {
     let path = path.as_ref().to_string_lossy(); // convert path into smth that implements Display
     match err.kind() {
         io::ErrorKind::NotFound =>

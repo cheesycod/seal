@@ -1,6 +1,3 @@
-#![feature(default_field_values)]
-#![feature(str_as_str)]
-
 #![deny(clippy::unwrap_used, reason = "
     seal prefers explicit panic! or unreachable!
     or even .expect in an expr context; all unwraps must be justified"

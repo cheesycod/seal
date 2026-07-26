@@ -1,10 +1,13 @@
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use archive::{ArchiveEntry, ArchiveFormat};
 use mluau::prelude::*;
 use crate::prelude::*;
+use crate::std_fs::entry::wrap_io_read_errors;
 use crate::std_time::datetime::DateTime;
 use crate::std_fs::file_size::FileSize;
+use bstr::ByteSlice;
 
 enum EntryType {
     File,
@@ -64,10 +67,103 @@ fn get_mtime(t: &LuaTable) -> LuaResult<Option<SystemTime>> {
     }
 }
 
+/// When we make archive entries from file we need to ensure that we don't save
+/// the entire absolute path of the file as the 'path' because that creates archive
+/// with absolute paths (which even we reject by default)
+fn archive_entry_from_file<P: AsRef<Path>>(path: P, keep_children: usize) -> Result<ArchiveEntry, std::io::Error> {
+    let contents = std::fs::read(&path)?;
+
+    let buffy = std::path::PathBuf::new();
+    // get the last n components of the path (usually 1 unless nested dirs)
+    // and basically 'collect' (fold) them into a PathBuf that we alloc above
+    let components = &mut path
+        .as_ref()
+        .components()
+        .rev()
+        .take(keep_children)
+        .try_fold(buffy, |mut acc, comp| {
+            if let std::path::Component::Normal(c) = comp {
+                acc.push(c);
+                std::ops::ControlFlow::Continue(acc)
+            } else {
+                std::ops::ControlFlow::Break(acc)
+            }
+        });
+    
+    let path = match components {
+        std::ops::ControlFlow::Continue(b) => {
+            // components are backwards so we have to reverse them again
+            // unfortunately can't do this easily without allocing another PathBuf
+            b.components().rev().collect::<PathBuf>()
+        },
+        std::ops::ControlFlow::Break(_) => {
+            std::path::PathBuf::from(path
+                .as_ref()
+                .file_name()
+                .unwrap_or(std::ffi::OsStr::new("<path not found>"))
+                .to_owned()
+            )
+        }
+    };
+
+    Ok(ArchiveEntry::file(path, contents))
+}
+
+fn archive_entries_from_directory<P: AsRef<Path>>(path: P, memo: &mut Vec<ArchiveEntry>, depth: Option<usize>) -> Result<(), std::io::Error> {
+    let path = path.as_ref();
+
+    let depth = depth.unwrap_or(1);
+
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            return archive_entries_from_directory(path, memo, Some(depth + 1));
+        } else if path.is_file() {
+            memo.push(archive_entry_from_file(&path, depth + 1)?);
+        }
+    }
+
+    Ok(())
+}
+
+pub(super) enum Entries {
+    One(ArchiveEntry),
+    Many(Vec<ArchiveEntry>)
+}
+
+fn archive_entries_from_path(path: &Path) -> LuaResult<Entries> {
+    if path.is_file() {
+        match archive_entry_from_file(path, 1) {
+            Ok(entry) => Ok(Entries::One(entry)),
+            Err(err) => {
+                wrap_io_read_errors(err, "", path)
+            }
+        }
+    } else if path.is_dir() {
+        let mut entries = Vec::new();
+        if let Err(err) = archive_entries_from_directory(path, &mut entries, None) {
+            return wrap_io_read_errors(err, "", path);
+        }
+        Ok(Entries::Many(entries))
+    } else {
+        wrap_err!("expected path to file or directory, got path to something else. If you want to add a symlink, construct it via table.")
+    }
+}
+
 /// stupid wrapper to make ArchiveEntry from luau tables
 /// we omit function_name here because caller should not use ? to propagate errors from this function
-pub(super) fn from_value(value: &LuaValue) -> LuaResult<ArchiveEntry> {
+pub(super) fn from_value(value: &LuaValue) -> LuaResult<Entries> {
     let t = match value {
+        LuaValue::String(p) => {
+            let Ok(valid_utf8_path) = p.to_str() else {
+                return wrap_err!("path must be valid utf-8");
+            };
+            // SAFETY: path must be valid utf-8 because we just checked it above
+            let path = Path::new(unsafe { valid_utf8_path.as_bytes().to_str_unchecked() });
+            let entries = archive_entries_from_path(path)?;
+            return Ok(entries);
+        },
         LuaValue::Table(t) => t,
         other => {
             return wrap_err!("expected entry to be an ArchiveEntry table (type: {}), got: {:?}", VALID_ENTRY_TYPES, other);
@@ -118,7 +214,7 @@ pub(super) fn from_value(value: &LuaValue) -> LuaResult<ArchiveEntry> {
         entry = entry.with_mtime(mtime);
     }
 
-    Ok(entry)
+    Ok(Entries::One(entry))
 }
 
 /// Converts an entry's `mtime` into a `DateTime` userdata (from `@std/time`), or `LuaNil` if

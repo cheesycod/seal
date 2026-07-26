@@ -26,7 +26,7 @@ fn zlib_compress(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
 
     let compression_level = match multivalue.pop_front() {
         Some(LuaValue::String(s)) => {
-            match s.as_bytes().as_slice() {
+            match &*s.as_bytes() {
                 b"Default" => Compression::default(),
                 b"Fast" => Compression::fast(),
                 b"Best" => Compression::best(),

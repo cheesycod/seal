@@ -2,7 +2,7 @@ use mluau::prelude::*;
 use crate::prelude::*;
 
 use crate::std_io::format;
-
+use entry::Entries;
 use std::fs;
 
 pub mod extract;
@@ -172,7 +172,21 @@ impl LuaUserData for Archive {
                     return wrap_err!("{}: index should be 1 or greater (got {})", function_name, index);
                 }
 
-                entries.insert(index, entry);
+                match entry {
+                    Entries::One(entry) => {
+                        entries.insert(index, entry);
+                    },
+                    Entries::Many(mut multiple) => {
+                        // swap first and last because we're not shifting insert index
+                        // so inserting will insert backwards and last element is likely directory
+                        let len = multiple.len();
+                        multiple.swap(0, len - 1);
+                        for element in multiple {
+                            entries.insert(index, element);
+                        }
+                    }
+                }
+
                 Ok(())
             }
         );
@@ -187,7 +201,17 @@ impl LuaUserData for Archive {
                             return wrap_err!("{}: cannot create ArchiveEntry from value passed at index {} due to err: {}", function_name, index, err);
                         }
                     };
-                    this.entries.push(entry);
+
+                    match entry {
+                        Entries::One(entry) => {
+                            this.entries.push(entry);
+                        },
+                        Entries::Many(entries) => {
+                            for element in entries {
+                                this.entries.push(element);
+                            }
+                        }
+                    }
                 }
                 Ok(())
             }

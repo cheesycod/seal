@@ -6,10 +6,17 @@ use petname::Generator;
 /// helper struct for ThreadSpawnOptions tables so we don't crowd std_thread
 use std::{fs, io, path::PathBuf};
 
-#[derive(Default)]
 pub struct ChannelCapacity {
-    pub regular: usize = 12,
-    pub bytes: usize = 24,
+    pub regular: usize,
+    pub bytes: usize,
+}
+impl ChannelCapacity {
+    fn default() -> Self {
+        Self {
+            regular: 24,
+            bytes: 12,
+        }
+    }
 }
 pub struct ThreadSpawnOptions {
     pub name: String,
