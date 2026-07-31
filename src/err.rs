@@ -95,7 +95,8 @@ pub fn setup_panic_hook() {
             };
 
             let save_path = {
-                let dt = jiff::Zoned::now().strftime("%Y-%m-%dT%H:%M:%S%z");
+                // colons aren't valid in windows filenames, so we avoid %H:%M:%S and %z's `+00:00`-style output
+                let dt = jiff::Zoned::now().strftime("%Y-%m-%dT%H-%M-%S");
                 format!("PANIC_IN_THE_SEAL_INTERNALS_{dt}.log")
             };
 
@@ -193,7 +194,8 @@ pub fn display_error_and_exit(err: LuaError) -> ! {
     }
 
     if let Ok(var) = std::env::var("SEAL_LOG_ERRORS") && var.eq_ignore_ascii_case("true") {
-        let file_name = format!("error.{}.seal.log", jiff::Timestamp::now());
+        // colons aren't valid in windows filenames, so we avoid Timestamp's default RFC 3339 Display
+        let file_name = format!("error.{}.seal.log", jiff::Zoned::now().strftime("%Y-%m-%dT%H-%M-%S"));
         if let Err(err) = std::fs::write(&file_name, &error_message) {
             let _ = writeln!(stderr, "can't write error message to log file '{}' due to err: {}", file_name, err);
         };
