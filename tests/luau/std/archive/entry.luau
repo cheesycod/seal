@@ -129,4 +129,32 @@ assert(#empty_entries == 1, `expected exactly 1 entry (the empty dir itself), go
 assert(empty_entries[1].type == "Directory", "the sole entry for an empty directory should be a Directory")
 assert(empty_entries[1]:path() == "empty", `expected path "empty", got {empty_entries[1]:path()}`)
 
+-- :try_file()/:try_directory()/:try_symlink() narrow to the matching type, returning nil (not erroring)
+-- when self isn't that type; :expect_file()/etc should still error in that case
+const file_entry = entry.create.file("some.txt", "contents")
+const dir_entry = entry.create.directory("some_dir")
+const symlink_entry = entry.create.symlink("some_link", "some.txt")
+
+assert(file_entry:try_file() ~= nil, "try_file on a File entry should return itself, not nil")
+assert(file_entry:try_directory() == nil, "try_directory on a File entry should return nil")
+assert(file_entry:try_symlink() == nil, "try_symlink on a File entry should return nil")
+
+assert(dir_entry:try_directory() ~= nil, "try_directory on a Directory entry should return itself, not nil")
+assert(dir_entry:try_file() == nil, "try_file on a Directory entry should return nil")
+assert(dir_entry:try_symlink() == nil, "try_symlink on a Directory entry should return nil")
+
+assert(symlink_entry:try_symlink() ~= nil, "try_symlink on a Symlink entry should return itself, not nil")
+assert(symlink_entry:try_file() == nil, "try_file on a Symlink entry should return nil")
+assert(symlink_entry:try_directory() == nil, "try_directory on a Symlink entry should return nil")
+
+assert(pcall(function()
+    return dir_entry:expect_file()
+end) == false, "expect_file on a Directory entry should error, not return nil")
+assert(pcall(function()
+    return file_entry:expect_directory()
+end) == false, "expect_directory on a File entry should error, not return nil")
+assert(pcall(function()
+    return file_entry:expect_symlink()
+end) == false, "expect_symlink on a File entry should error, not return nil")
+
 fs.dir.try_remove(temp_path)
