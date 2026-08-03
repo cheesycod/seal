@@ -11,6 +11,10 @@ This document will contain new features, breaking changes, etc.
 - [_VERSION global changed formats](#breaking-change-to-_version), now recommend using `_RUNTIME` and `_LUAU` instead
 - Raw terminal events functionality [moved from @std/io/input to @std/terminal](#breaking-changes-apis-moved)
 
+### More release targets + support 32-bit platforms
+
+Primarily so the other common Android target (androideabi) compiles, but also why not?
+
 ### Extracting, reading, and writing Archives in memory
 
 - I added support for zip, tar + 5 of its compression formats, 7z, ar, deb.
