@@ -122,8 +122,16 @@ impl DebugInfo {
 }
 
 
+/// widens a `LuaInteger` to `i64`. `LuaInteger` is `i32` on 32-bit targets (e.g. armv7 android) and
+/// `i64` everywhere else; use this instead of `as i64` so the conversion doesn't trigger
+/// clippy::unnecessary_cast on 64-bit platforms where `LuaInteger` is already `i64`
+pub fn int_to_i64(i: LuaInteger) -> i64 {
+    #[allow(clippy::useless_conversion, reason = "needed on platforms where LuaInteger is i32")]
+    i64::from(i)
+}
+
 /// safely convert i64 to usize while handling common problems like negatives and out of ranges
-pub fn int_to_usize(i: i64, function_name: &str, parameter_name: &'static str) -> LuaResult<usize> {
+pub fn int_to_usize(i: LuaInteger, function_name: &str, parameter_name: &'static str) -> LuaResult<usize> {
     if i.is_negative() {
         return wrap_err!("{}: {} represents a byte offset or countable number and cannot be negative (got {})", function_name, parameter_name, i);
     }
@@ -135,7 +143,7 @@ pub fn int_to_usize(i: i64, function_name: &str, parameter_name: &'static str) -
     }
 }
 
-pub fn int_to_u64(i: i64, function_name: &'static str, parameter_name: &'static str) -> LuaResult<u64> {
+pub fn int_to_u64(i: LuaInteger, function_name: &'static str, parameter_name: &'static str) -> LuaResult<u64> {
     if i.is_negative() {
         return wrap_err!("{}: {} must be positive (got: {})", function_name, parameter_name, i);
     }
@@ -165,7 +173,7 @@ pub fn float_to_usize(f: f64, function_name: &'static str, parameter_name: &'sta
     }
 }
 
-pub fn int_to_u32(i: i64, function_name: &'static str, parameter_name: &'static str) -> LuaResult<u32> {
+pub fn int_to_u32(i: LuaInteger, function_name: &'static str, parameter_name: &'static str) -> LuaResult<u32> {
     if i.is_negative() {
         return wrap_err!("{}: {} must be positive (got: {})", function_name, parameter_name, i);
     }
@@ -211,7 +219,7 @@ pub fn float_to_u16(f: f64, function_name: &'static str, parameter_name: &'stati
     Ok(u)
 }
 
-pub fn int_to_u16(i: i64, function_name: &'static str, parameter_name: &'static str) -> LuaResult<u16> {
+pub fn int_to_u16(i: LuaInteger, function_name: &'static str, parameter_name: &'static str) -> LuaResult<u16> {
     if i.is_negative() {
         return wrap_err!("{}: {} must be positive (got: {})", function_name, parameter_name, i);
     }
@@ -223,7 +231,7 @@ pub fn int_to_u16(i: i64, function_name: &'static str, parameter_name: &'static 
     }
 }
 
-pub fn int_to_i32(i: i64, function_name: &'static str, parameter_name: &'static str) -> LuaResult<i32> {
+pub fn int_to_i32(i: LuaInteger, function_name: &'static str, parameter_name: &'static str) -> LuaResult<i32> {
     match i32::try_from(i) {
         Ok(i) => Ok(i),
         Err(err) => {
