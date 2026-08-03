@@ -12,10 +12,14 @@
 <h4>
 
 ```luau
-function xz.compress(content: string | buffer) -> buffer,
+function xz.compress(content: string | buffer, level: number?) -> buffer,
 ```
 
 </h4>
+
+Compresses xz-encoded (.xz) data at compression `level`.
+
+xz levels range from 0 (fastest) to 9 (most compressed); defaults to 6.
 
 ---
 

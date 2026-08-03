@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use mluau::prelude::*;
 use crate::prelude::*;
 use crate::std_fs::{self, entry::{self, wrap_io_read_errors, get_path_from_entry}};
@@ -148,8 +148,12 @@ fn dir_find(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
             return wrap_err!("{} expected name to be string, got nothing", function_name);
         }
     };
+    if search_name.starts_with("/") {
+        return wrap_err!("{}: search name starts with absolute path prefix '/'; this is most likely user error", function_name);
+    }
     let entry_path = PathBuf::from(&entry_path);
-    let search_path = Path::join(&entry_path, search_name);
+    #[allow(clippy::disallowed_methods, reason = "Path::join is safe here; we've validated path doesn't start with /")]
+    let search_path = entry_path.join(search_name);
     let search_path = search_path.to_str();
     match search_path {
         Some(search_path) => {

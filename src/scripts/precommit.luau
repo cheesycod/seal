@@ -90,8 +90,16 @@ git add README.md
 git add docs/reference/*
 ]]
 
-fs.writefile(hook_path, SCRIPT_SRC)
+-- write to a temp file and atomically move it into place instead of overwriting hook_path
+-- directly: this script runs *as* the currently-executing pre-commit hook, so writing straight
+-- to hook_path truncates the very file the shell is still reading lines from mid-execution,
+-- corrupting its read and producing bogus syntax errors on whatever line it reads next.
+-- fs.move (fs::rename) is atomic, so the running shell keeps reading the old (unlinked) inode
+-- to completion while the new content takes over the path for the next invocation.
+local tmp_hook_path = hook_path .. ".tmp"
+fs.writefile(tmp_hook_path, SCRIPT_SRC)
 if env.os ~= "Windows" then
-    process.shell(`chmod +x {hook_path}`):unwrap()
+    process.shell(`chmod +x {tmp_hook_path}`):unwrap()
 end
+fs.move(tmp_hook_path, hook_path)
 print(`installed/updated pre-commit hook at {hook_path}`)

@@ -192,6 +192,7 @@ pub fn find_project(path: &str, projects_up: usize) -> Option<PathBuf> {
     let mut matches = 0;
 
     loop {
+        #[allow(clippy::disallowed_methods, reason = "joining with a RHS literal is safe")]
         let seal_dir = current.join(".seal");
         if seal_dir.is_dir() {
             matches += 1;

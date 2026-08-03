@@ -18,9 +18,17 @@ fn expect_content(value: Option<LuaValue>, function_name: &'static str) -> LuaRe
     Ok(bytes)
 }
 
-fn compress(contents: &[u8], function_name: &'static str) -> LuaResult<Vec<u8>> {
-    let compressed = match ArchiveBuilder::new().build_single_file("data", contents, archive::ArchiveFormat::Bz2) {
+fn compress(contents: &[u8], level: Option<u32>, function_name: &'static str) -> LuaResult<Vec<u8>> {
+    let mut builder = ArchiveBuilder::new();
+    if let Some(level) = level {
+        builder = builder.compression_level(archive::CompressionLevel::Bzip2(level));
+    }
+
+    let compressed = match builder.build_single_file("data", contents, archive::ArchiveFormat::Bz2) {
         Ok(contents) => contents,
+        Err(archive::ArchiveError::InvalidCompressionLevel(reason)) => {
+            return wrap_err!("{}: invalid level for bzip2 compression; {}", function_name, reason);
+        },
         Err(err) => {
             return wrap_err!("{}: unable to compress data into bz2 due to err: {}", function_name, err);
         }
@@ -46,10 +54,19 @@ fn decompress(contents: &[u8], path: Option<&str>, max_size: Option<u64>, functi
     Ok(decompressed)
 }
 
-fn bz2_compress(luau: &Lua, value: LuaValue) -> LuaValueResult {
-    let function_name = "bz2.compress(content: string | buffer)";
-    let content = expect_content(Some(value), function_name)?;
-    let compressed = compress(&content, function_name)?;
+fn bz2_compress(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
+    let function_name = "bz2.compress(content: string | buffer, level: number?)";
+    let content = expect_content(multivalue.pop_front(), function_name)?;
+    let level = match multivalue.pop_front() {
+        Some(LuaValue::Integer(i)) => Some(int_to_u32(i, function_name, "level")?),
+        Some(LuaValue::Number(f)) => Some(float_to_u32(f, function_name, "level")?),
+        Some(LuaNil) | None => None,
+        Some(other) => {
+            return wrap_err!("{}: expected level to be a number or nil, got: {:?}", function_name, other);
+        }
+    };
+
+    let compressed = compress(&content, level, function_name)?;
     ok_buffy(compressed, luau)
 }
 

@@ -61,3 +61,18 @@ end), "xz decompress should error on non-xz data")
 assert(not pcall(function()
     return (xz :: any).compress(nil)
 end), "xz compress should error without content")
+
+-- the level param round-trips and a high level compresses at least as well as a low one
+const level_low = xz.compress(repetitive, 1)
+const level_high = xz.compress(repetitive, 9)
+assert(buffer.tostring(xz.decompress(level_low)) == repetitive, "xz roundtrip with a low level failed")
+assert(buffer.tostring(xz.decompress(level_high)) == repetitive, "xz roundtrip with a high level failed")
+assert(
+    buffer.len(level_high) <= buffer.len(level_low),
+    `expected xz level 9 to compress at least as well as level 1 ({buffer.len(level_high)} vs {buffer.len(level_low)} bytes)`
+)
+
+-- an out-of-range level is rejected, not silently clamped
+assert(not pcall(function()
+    return xz.compress(repetitive, 15)
+end), "xz compress should error on an out-of-range level (15)")

@@ -67,5 +67,10 @@
     "scope": "luau",
     "prefix": "doc",
     "body": "--[=[\n\t$0\n]=]"
+  },
+  "Allow disallowed methods with reason": {
+    "scope": "rust",
+    "prefix": "allow",
+    "body": "#[allow(clippy::disallowed_methods, reason = \"$0\")]"
   }
 }

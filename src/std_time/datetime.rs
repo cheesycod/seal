@@ -90,7 +90,7 @@ impl DateTime {
     pub fn get_userdata(self, luau: &Lua) -> LuaValueResult {
         ok_userdata(self, luau)
     }
-    pub fn to_system_time(&self) -> SystemTime {
+    pub fn _to_system_time(&self) -> SystemTime {
         SystemTime::from(self.inner.timestamp())
     }
     pub fn date(&self) -> jiff::civil::Date {

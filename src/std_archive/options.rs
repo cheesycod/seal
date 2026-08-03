@@ -2,6 +2,7 @@ use mluau::prelude::*;
 use crate::prelude::*;
 
 use crate::std_fs::file_size::{FileSize, GIGABYTE, MEGABYTE};
+use super::compression_level::ArchiveCompressionLevel;
 
 const MAX_FILE_SIZE: u64 = 500 * MEGABYTE;
 const MAX_TOTAL_SIZE: u64 = 4 * GIGABYTE;
@@ -11,6 +12,7 @@ pub struct ArchiveOptions {
     pub max_file_size: FileSize,
     pub max_total_size: FileSize,
     pub allow_unsafe_path_traversals: bool,
+    pub compression_level: Option<ArchiveCompressionLevel>,
 }
 impl ArchiveOptions {
     pub fn extractor(&self) -> archive::ArchiveExtractor {
@@ -20,8 +22,12 @@ impl ArchiveOptions {
             .allow_unsafe_path_traversals(self.allow_unsafe_path_traversals)
     }
     pub fn builder(&self) -> archive::ArchiveBuilder {
-        archive::ArchiveBuilder::new()
-            .allow_unsafe_path_traversals(self.allow_unsafe_path_traversals)
+        let mut builder = archive::ArchiveBuilder::new()
+            .allow_unsafe_path_traversals(self.allow_unsafe_path_traversals);
+        if let Some(compression_level) = self.compression_level {
+            builder = builder.compression_level(compression_level.inner());
+        }
+        builder
     }
     fn default() -> Self {
         Self {
@@ -29,6 +35,7 @@ impl ArchiveOptions {
             max_total_size: FileSize::from_bytes(MAX_TOTAL_SIZE),
             allow_symlinks: false,
             allow_unsafe_path_traversals: false,
+            compression_level: None,
         }
     }
     pub fn from_value(value: LuaValue, function_name: &'static str) -> LuaResult<Self> {
@@ -55,6 +62,19 @@ impl ArchiveOptions {
             Ok(got)
         }
 
+        fn get_compression_level_opt(t: &LuaTable, param: &'static str, function_name: &'static str) -> LuaResult<Option<ArchiveCompressionLevel>> {
+            let got = match t.raw_get(param)? {
+                LuaValue::UserData(ud) => {
+                    Some(ArchiveCompressionLevel::expect_cloned_or_nil(ud, param, function_name)?)
+                },
+                LuaNil => None,
+                other => {
+                    return wrap_err!("{}: expected options.{} to be a CompressionLevel or nil, got: {:?}", function_name, param, other);
+                }
+            };
+            Ok(got)
+        }
+
         fn get_opt_bool(t: &LuaTable, param: &'static str, function_name: &'static str) -> LuaResult<Option<bool>> {
             match t.raw_get(param)? {
                 LuaValue::Boolean(b) => Ok(Some(b)),
@@ -74,12 +94,14 @@ impl ArchiveOptions {
             .unwrap_or(false);
         let allow_unsafe_path_traversals = get_opt_bool(&t, "allow_unsafe_path_traversals", function_name)?
             .unwrap_or(false);
+        let compression_level = get_compression_level_opt(&t, "compression_level", function_name)?;
 
         Ok(Self {
             max_file_size,
             max_total_size,
             allow_symlinks,
-            allow_unsafe_path_traversals
+            allow_unsafe_path_traversals,
+            compression_level,
         })
     }
 }

@@ -68,7 +68,7 @@ checksum = "d67af77d68a931ecd5cbd8a3b5987d63a1d1d1278f7f6a60ae33db485cdebb69"
 [[package]]
 name = "archive"
 version = "0.4.0"
-source = "git+https://github.com/deviaze/archive.git?branch=safer#9502e87c70256b576e575aca65787ab39589f4dc"
+source = "git+https://github.com/deviaze/archive.git?branch=safer#61de7d7223dea21444ce2c7b5127831eb31e260a"
 dependencies = [
  "ar",
  "bzip2",
@@ -1324,7 +1324,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.9.0"
-source = "git+https://github.com/mluau/mluau.git?branch=fix-classes#602ad71a788aa2bd48db1fe5659a80414b2584f9"
+source = "git+https://github.com/mluau/mluau.git#8cb2a42a9787b8c02af62a58578f3a32d3fb6e40"
 dependencies = [
  "cc",
  "cfg-if",
@@ -1335,7 +1335,7 @@ dependencies = [
 [[package]]
 name = "mluau"
 version = "0.11.5"
-source = "git+https://github.com/mluau/mluau.git?branch=fix-classes#602ad71a788aa2bd48db1fe5659a80414b2584f9"
+source = "git+https://github.com/mluau/mluau.git#8cb2a42a9787b8c02af62a58578f3a32d3fb6e40"
 dependencies = [
  "bstr",
  "bytes",
@@ -2037,7 +2037,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "seal"
-version = "0.0.8-rc.3"
+version = "0.8.0"
 dependencies = [
  "aho-corasick",
  "archive",

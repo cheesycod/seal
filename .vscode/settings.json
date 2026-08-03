@@ -29,6 +29,9 @@
   ],
   "luau-lsp.fflags.enableNewSolver": true,
   "luau-lsp.fflags.enableByDefault": true,
+  "luau-lsp.fflags.override": {
+    "DebugLuauUserDefinedClasses": "true"
+  },
   "luau-lsp.inlayHints.functionReturnTypes": true,
   "luau-lsp.inlayHints.parameterNames": "all",
   "luau-lsp.inlayHints.variableTypes": false,

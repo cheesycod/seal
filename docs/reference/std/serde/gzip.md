@@ -12,10 +12,14 @@
 <h4>
 
 ```luau
-function gzip.compress(content: string | buffer) -> buffer,
+function gzip.compress(content: string | buffer, level: number?) -> buffer,
 ```
 
 </h4>
+
+Compresses gzip-encoded (.gz) data at compression `level`.
+
+gzip levels range from 0 (fastest) to 9 (most compressed); defaults to 6.
 
 ---
 

@@ -1,6 +1,3 @@
-#![feature(default_field_values)]
-#![feature(str_as_str)]
-
 #![deny(clippy::unwrap_used, reason = "
     seal prefers explicit panic! or unreachable!
     or even .expect in an expr context; all unwraps must be justified"
@@ -16,13 +13,18 @@
         let _ = writeln!(stdout, <format string>, args);"
 )]
 #![warn(
-    clippy::print_stderr, 
+    clippy::print_stderr,
     reason="eprint!/eprintln! may cause seal to panic in normal operation;
     - if you're in a function that returns LuaResult/LVR, use eput! or eputs! instead
     - otherwise you need to lock stderr and use writeln! and ignore/handle its Result:
         let stderr = std::io::stderr().lock();
         let _ = writeln!(stderr, <format string>, args);"
 )]
+// Path::join silently discards the receiver if the argument is absolute, which is a path
+// traversal footgun whenever the joined segment comes from an archive entry, user input, etc.
+// clippy's own join_absolute_paths only catches literal absolute-path arguments, not this
+// runtime case, so we ban the method outright via clippy.toml's disallowed-methods.
+#![warn(clippy::disallowed_methods, reason = "see clippy.toml for banned methods and why")]
 
 use crate::{prelude::*, setup::SetupOptions};
 use mluau::prelude::*;

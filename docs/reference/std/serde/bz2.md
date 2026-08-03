@@ -12,10 +12,14 @@
 <h4>
 
 ```luau
-function bz2.compress(content: string | buffer) -> buffer,
+function bz2.compress(content: string | buffer, level: number?) -> buffer,
 ```
 
 </h4>
+
+Compresses bzip2-encoded (.bz2) data at compression `level`.
+
+bzip2 levels range from 1 (fastest) to 9 (most compressed); defaults to 6.
 
 ---
 

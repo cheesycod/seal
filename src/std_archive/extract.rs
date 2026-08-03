@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -16,13 +17,11 @@ use crate::std_fs::{
 };
 
 // permission bits on unix system, noop on windows
-fn apply_mode(path: &Path, mode: Option<u32>, function_name: &'static str) -> LuaEmptyResult {
+fn set_mode_raw(path: &Path, mode: Option<u32>) -> io::Result<()> {
     #[cfg(unix)]
     if let Some(mode) = mode {
         use std::os::unix::fs::PermissionsExt;
-        if let Err(err) = fs::set_permissions(path, fs::Permissions::from_mode(mode)) {
-            return wrap_io_read_errors_empty(err, function_name, path);
-        }
+        fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
     }
     #[cfg(not(unix))]
     let _ = mode;
@@ -32,7 +31,7 @@ fn apply_mode(path: &Path, mode: Option<u32>, function_name: &'static str) -> Lu
 
 /// needs to be open for writes on windows or setting mtime fails with permission denied
 /// directory mtimes are just skipped for rn, not worth fixing atm
-fn apply_mtime(path: &Path, mtime: Option<SystemTime>, function_name: &'static str) -> LuaEmptyResult {
+fn set_mtime_raw(path: &Path, mtime: Option<SystemTime>) -> io::Result<()> {
     let Some(mtime) = mtime else {
         return Ok(());
     };
@@ -42,7 +41,7 @@ fn apply_mtime(path: &Path, mtime: Option<SystemTime>, function_name: &'static s
         Err(_) => match fs::File::open(path) {
             Ok(file) => file,
             Err(_) if path.is_dir() => return Ok(()),
-            Err(err) => return wrap_io_read_errors_empty(err, function_name, path),
+            Err(err) => return Err(err),
         }
     };
 
@@ -50,10 +49,24 @@ fn apply_mtime(path: &Path, mtime: Option<SystemTime>, function_name: &'static s
         if path.is_dir() {
             return Ok(());
         }
-        return wrap_io_read_errors_empty(err, function_name, path);
+        return Err(err);
     }
 
     Ok(())
+}
+
+pub(super) fn apply_mode(path: &Path, mode: Option<u32>, function_name: &'static str) -> LuaEmptyResult {
+    match set_mode_raw(path, mode) {
+        Ok(()) => Ok(()),
+        Err(err) => wrap_io_read_errors_empty(err, function_name, path),
+    }
+}
+
+pub(super) fn apply_mtime(path: &Path, mtime: Option<SystemTime>, function_name: &'static str) -> LuaEmptyResult {
+    match set_mtime_raw(path, mtime) {
+        Ok(()) => Ok(()),
+        Err(err) => wrap_io_read_errors_empty(err, function_name, path),
+    }
 }
 
 const UNSAFE_PATH_BULLETPOINTS: &str = "
@@ -107,6 +120,9 @@ pub fn contents(
         Err(ArchiveError::UnsafePath(bad_path)) => {
             return wrap_err!("{}: Path/Symlink Traversal: archive {}\n \nArchive contains a path that, once extracted, will traverse outside the extraction directory:\nTraversing path: '{}'\n \n{}", function_name, path_for_display(), bad_path, UNSAFE_PATH_BULLETPOINTS);
         },
+        Err(ArchiveError::InvalidCompressionLevel(reason)) => {
+            return wrap_err!("{}: invalid CompressionLevel for this kind of archive/single-file format; {}", function_name, reason);
+        },
         Err(err) => {
             return wrap_err!("{}: unable to extract archive at '{}' due to err: {}", function_name, path_for_display(), err);
         }
@@ -115,15 +131,182 @@ pub fn contents(
     Ok(entries)
 }
 
-pub fn write_to_disk<P: AsRef<Path>>(
-    entries: &[ArchiveEntry],
+/// Reads `contents` (the compressed archive bytes) and writes its entries straight to disk
+/// through `ArchiveExtractor::extract_streaming`, without ever collecting a `Vec<ArchiveEntry>`
+pub fn stream_to_disk<P: AsRef<Path>>(
+    contents: &[u8],
+    path: Option<&str>,
     destination: P,
-    options: ArchiveOptions,
+    options: &ArchiveOptions,
     format: ArchiveFormat,
     function_name: &'static str
 ) -> LuaEmptyResult {
     let destination = destination.as_ref().to_path_buf();
+    let extractor = options.extractor();
+    let path_for_display = move || {
+        match path {
+            Some(path) => Cow::Owned(format!("at '{}'", path)),
+            None => Cow::Borrowed("loaded from memory")
+        }
+    };
+
+    fn create_parent_if_needed(path: &Path) -> io::Result<()> {
+        let Some(parent) = path.parent() else {
+            return Ok(());
+        };
+        match fs::create_dir_all(parent) {
+            Ok(()) => Ok(()),
+            Err(err) if matches!(err.kind(), std::io::ErrorKind::AlreadyExists) => Ok(()),
+            Err(err) => Err(err),
+        }
+    }
+
+    fn unsafe_path_traversals_message(bad_path: String) -> String {
+        format!("Path/Symlink Traversal:\n \nArchive contains a path that, once extracted, will traverse outside the extraction directory:\nTraversing path: '{}'\n \n{}", bad_path, UNSAFE_PATH_BULLETPOINTS)
+    }
+
+    // mirrors the validate_path_safety in write_to_disk, but raw (io::Error) so it can be
+    // called from inside extract_streaming's callback, whose Result is archive::Result
+    fn validate_path_safety(path: &Path, options: &ArchiveOptions) -> io::Result<()> {
+        use std::io::Write;
+        let validation = archive::path_safety::validate_path(path.to_string_lossy().as_ref(), false);
+        if let Err(ArchiveError::UnsafePath(bad_path)) = validation {
+            if options.allow_unsafe_path_traversals {
+                let mut stderr = std::io::stderr().lock();
+                if !colors::are_disabled() {
+                    let _ = writeln!(stderr, "{}[WARN]{}{} writing to '{}' (ArchiveOptions.allow_unsafe_path_traversals enabled){}", colors::BOLD_YELLOW, colors::RESET, colors::YELLOW, bad_path, colors::RESET);
+                } else {
+                    let _ = writeln!(stderr, "[WARN] writing to '{}' (ArchiveOptions.allow_unsafe_path_traversals enabled)", bad_path);
+                }
+            } else {
+                return Err(io::Error::other(unsafe_path_traversals_message(bad_path)));
+            }
+        }
+        Ok(())
+    }
+
     if format.is_single_file() {
+        let result = extractor.extract_streaming(contents, format, |meta, reader| {
+            let mut file = fs::File::create(&destination)?;
+            io::copy(reader, &mut file)?;
+            set_mode_raw(&destination, meta.mode)?;
+            set_mtime_raw(&destination, meta.mtime)?;
+            Ok(())
+        });
+
+        if let Err(err) = result {
+            return translate_streaming_err(err, &path_for_display, format, function_name);
+        }
+        return Ok(());
+    }
+
+    // symlinks are created after every other entry is written; an attacker could otherwise smuggle a symlink 
+    // in early and have a later "legitimate" entry write straight through it
+    let mut symlinks: Vec<(PathBuf, String)> = Vec::new();
+
+    // directory mtimes are applied after every entry is written, since writing a file inside
+    // a directory bumps that directory's mtime right back
+    let mut directory_mtimes: Vec<(PathBuf, SystemTime)> = Vec::new();
+
+    let result = extractor.extract_streaming(contents, format, |meta, reader| {
+        let entry_path = Path::new(&meta.path);
+        validate_path_safety(entry_path, options)?;
+        #[allow(clippy::disallowed_methods, reason = "\
+            Case 1: With default options, the validate_path_safety call above ensures entry_path is not an absolute path\
+            Case 2: if unsafe_path_traversals is ALLOWED, the user is purposely opting into path clobbering\
+        ")]
+        let full_path = destination.join(entry_path);
+
+        if meta.is_dir {
+            fs::create_dir_all(&full_path)?;
+            set_mode_raw(&full_path, meta.mode)?;
+            if let Some(mtime) = meta.mtime {
+                directory_mtimes.push((full_path, mtime));
+            }
+        } else if meta.is_symlink {
+            if !options.allow_symlinks {
+                return Err(io::Error::other(format!(
+                    "archive has internal symlink from {} -> {}; this is unusual...\n  pass options.allow_symlinks = true to extract symlinks",
+                    meta.path, meta.symlink_target().unwrap_or_default()
+                )).into());
+            }
+            symlinks.push((full_path, meta.symlink_target().unwrap_or_default().to_string()));
+        } else {
+            // fs::File::create can fail on some platforms if the parent path doesn't exist
+            create_parent_if_needed(&full_path)?;
+            let mut file = fs::File::create(&full_path)?;
+            io::copy(reader, &mut file)?;
+            set_mode_raw(&full_path, meta.mode)?;
+            set_mtime_raw(&full_path, meta.mtime)?;
+        }
+
+        Ok(())
+    });
+
+    if let Err(err) = result {
+        return translate_streaming_err(err, &path_for_display, format, function_name);
+    }
+
+    for (path, target) in symlinks {
+        crate::std_fs::create_symlink(&path.to_string_lossy(), &target, function_name)?;
+    }
+
+    for (path, mtime) in directory_mtimes {
+        apply_mtime(&path, Some(mtime), function_name)?;
+    }
+
+    Ok(())
+}
+
+fn translate_streaming_err<'a>(
+    err: ArchiveError,
+    path_for_display: &dyn Fn() -> Cow<'a, str>,
+    format: ArchiveFormat,
+    function_name: &'static str
+) -> LuaEmptyResult {
+    match err {
+        ArchiveError::FileTooLarge { path, size, limit } => {
+            let size = FileSize::from_bytes(size as u64);
+            let limit = FileSize::from_bytes(limit as u64);
+            if let Some(archive_path) = path {
+                wrap_err!("{}: file in archive {} at archive path '{}' (size {}) exceeds max_file_size ({}); see options to change defaults", function_name, path_for_display(), archive_path, size, limit)
+            } else {
+                wrap_err!("{}: a file in the archive {} (size {}) exceeds max_file_size ({}); see options to change defaults", function_name, path_for_display(), size, limit)
+            }
+        },
+        ArchiveError::TotalSizeTooLarge { size, limit } => {
+            let size = FileSize::from_bytes(size as u64);
+            let limit = FileSize::from_bytes(limit as u64);
+            wrap_err!("{}: archive (size {}) exceeds max_total_size ({}); see options to change defaults", function_name, size, limit)
+        },
+        ArchiveError::AllocationFailed { size, source } => {
+            let size = FileSize::from_bytes(size as u64);
+            wrap_err!("{}: you don't have enough memory to extract archive {}\n   (failed to reserve {} due to err: {})", function_name, path_for_display(), size, source)
+        },
+        ArchiveError::InvalidArchive(reason) => {
+            wrap_err!("{}: archive {} is invalid or not of format {}: {}", function_name, path_for_display(), format.name(), reason)
+        },
+        ArchiveError::UnsafePath(bad_path) => {
+            wrap_err!("{}: Path/Symlink Traversal: archive {}\n \nArchive contains a path that, once extracted, will traverse outside the extraction directory:\nTraversing path: '{}'\n \n{}", function_name, path_for_display(), bad_path, UNSAFE_PATH_BULLETPOINTS)
+        },
+        ArchiveError::InvalidCompressionLevel(reason) => {
+            wrap_err!("{}: invalid CompressionLevel for this kind of archive/single-file format; {}", function_name, reason)
+        },
+        err => {
+            wrap_err!("{}: unable to extract archive at '{}' due to err: {}", function_name, path_for_display(), err)
+        }
+    }
+}
+
+pub fn write_to_disk<P: AsRef<Path>>(
+    entries: &[ArchiveEntry],
+    destination: P,
+    options: ArchiveOptions,
+    format: Option<ArchiveFormat>,
+    function_name: &'static str
+) -> LuaEmptyResult {
+    let destination = destination.as_ref().to_path_buf();
+    if let Some(format) = format && format.is_single_file() {
         let contents = if let Some(file) = entries.first()
             && let Some(contents) = file.data()
         {
@@ -138,6 +321,7 @@ pub fn write_to_disk<P: AsRef<Path>>(
         let file = &entries[0];
         apply_mode(&destination, file.mode(), function_name)?;
         apply_mtime(&destination, file.mtime(), function_name)?;
+        return Ok(());
     }
 
     fn create_parent_if_needed(path: &PathBuf, function_name: &'static str) -> LuaEmptyResult {
@@ -183,6 +367,10 @@ pub fn write_to_disk<P: AsRef<Path>>(
     for entry in entries {
         let path = Path::new(entry.path());
         validate_path_safety(path, &options, function_name)?;
+        #[allow(clippy::disallowed_methods, reason = "\
+            Case 1: With default options, the validate_path_safety call above ensures entry_path is not an absolute path\
+            Case 2: if unsafe_path_traversals is ALLOWED, the user is purposely opting into path clobbering\
+        ")]
         let path = destination.join(path);
 
         match entry {
