@@ -11,6 +11,11 @@ use crate::std_fs::file_size::FileSize;
 use crate::std_io::colors;
 use crate::std_time::datetime::DateTime;
 
+enum ArchiveOutputPath {
+    As(PathBuf),
+    KeepChildren(usize),
+}
+
 #[derive(PartialEq)]
 pub(super) enum EntryType {
     File,
@@ -166,17 +171,13 @@ impl WrappedArchiveEntry {
         Ok(self)
     }
 
-    fn from_file_on_disk<DiskPath: AsRef<Path>, OutPath: AsRef<Path>>(
-        path: DiskPath,
-        keep_children: usize,
-        out_path: &Option<OutPath>
-    ) -> Result<Self, std::io::Error> {
-        let contents = std::fs::read(&path)?;
+    /// Reads a single file at `disk_path` into an entry whose archive path is exactly `archive_path`
+    fn from_file_on_disk(disk_path: &Path, archive_path: &Path) -> Result<Self, std::io::Error> {
+        let contents = std::fs::read(disk_path)?;
+        Self::file(archive_path, contents).with_metadata_from_disk(disk_path)
+    }
 
-        if let Some(out_path) = out_path {
-            return Self::file(out_path, contents).with_metadata_from_disk(&path);
-        }
-
+    fn trim_path_components(path: &Path, keep_children: usize) -> PathBuf {
         // When we make archive entries from file we need to ensure that we don't save
         // the entire absolute path of the file as the 'path' because that creates archive
         // with absolute paths (which even we reject by default)
@@ -185,7 +186,6 @@ impl WrappedArchiveEntry {
         // get the last n components of the path (usually 1 unless nested dirs)
         // and basically 'collect' (fold) them into a PathBuf that we alloc above
         let components = &mut path
-            .as_ref()
             .components()
             .rev()
             .take(keep_children)
@@ -197,8 +197,8 @@ impl WrappedArchiveEntry {
                     std::ops::ControlFlow::Break(acc)
                 }
             });
-        
-        let archive_path = match components {
+
+        match components {
             std::ops::ControlFlow::Continue(b) => {
                 // components are backwards so we have to reverse them again
                 // unfortunately can't do this easily without allocing another PathBuf
@@ -206,46 +206,45 @@ impl WrappedArchiveEntry {
             },
             std::ops::ControlFlow::Break(_) => {
                 std::path::PathBuf::from(path
-                    .as_ref()
                     .file_name()
                     .unwrap_or(std::ffi::OsStr::new("<path not found>"))
                     .to_owned()
                 )
             }
-        };
-
-        Self::file(&archive_path, contents).with_metadata_from_disk(&path)
+        }
     }
 
-    fn from_directory_on_disk<DiskPath: AsRef<Path>, OutPath: AsRef<Path>>(
-        path: DiskPath,
+    fn from_file_on_disk_trimmed(path: &Path, keep_children: usize) -> Result<Self, std::io::Error> {
+        let contents = std::fs::read(path)?;
+        let archive_path = Self::trim_path_components(path, keep_children);
+        Self::file(&archive_path, contents).with_metadata_from_disk(path)
+    }
+    
+    /// Recursively walks `path` on disk, pushing one `Directory` entry for path (in case dir is empty)
+    /// and then goes though each child and creates archive entries for each child, joining the child's name
+    /// to this directory's reference `archive_path` to ensure file at `path/a/b.txt` gets the path
+    /// `archive_path/a/b.txt`, not just `archive_path` (previous bug)
+    fn from_directory_on_disk(
+        disk_path: &Path,
         entries: &mut Vec<Self>,
-        depth: Option<usize>,
-        out_path: Option<OutPath>,
+        archive_path: &Path,
     ) -> Result<(), std::io::Error> {
-        let path = path.as_ref();
-        // depth should always start at 1 so we include the current directory name
-        let depth = depth.unwrap_or(1);
-
-        let directory_name = if let Some(ref out) = out_path {
-            out.as_ref().as_os_str()
-        } else {
-            path.file_name().unwrap_or(std::ffi::OsStr::new("directory name not present"))
-        };
-
-        let directory_entry = Self::directory(directory_name).with_metadata_from_disk(path)?;
+        let directory_entry = Self::directory(archive_path).with_metadata_from_disk(disk_path)?;
         entries.push(directory_entry);
-        
-        for entry in std::fs::read_dir(path)? {
+
+        for entry in std::fs::read_dir(disk_path)? {
             let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                return Self::from_directory_on_disk(path, entries, Some(depth + 1), out_path);
-            } else if path.is_file() {
-                let f = match Self::from_file_on_disk(&path, depth + 1, &out_path) {
+            let disk_path = entry.path();
+            #[allow(clippy::disallowed_methods, reason = "entry.file_name() cannot start with root sep")]
+            let child_archive_path = archive_path.join(entry.file_name());
+
+            if disk_path.is_dir() {
+                Self::from_directory_on_disk(&disk_path, entries, &child_archive_path)?;
+            } else if disk_path.is_file() {
+                let f = match Self::from_file_on_disk(&disk_path, &child_archive_path) {
                     Ok(e) => e,
                     Err(err) => {
-                        return Err(std::io::Error::other(format!("failed to handle path '{}' due to err: {}", path.display(), err)));
+                        return Err(std::io::Error::other(format!("failed to handle path '{}' due to err: {}", disk_path.display(), err)));
                     }
                 };
                 entries.push(f);
@@ -277,18 +276,30 @@ impl WrappedArchiveEntry {
         inner.symlink_target().map(|tar| tar.to_owned())
     }
 
-    fn from_path_on_disk(path: &Path, out_path: Option<&Path>) -> LuaResult<Entries> {
+    fn from_path_on_disk(path: &Path, out_path: Option<ArchiveOutputPath>) -> LuaResult<Entries> {
+        let function_name = "entry.read(path: Pathlike, as: (Pathlike | number)?)";
         if path.is_file() {
-            match Self::from_file_on_disk(path, 1, &out_path) {
+            let result = match out_path {
+                Some(ArchiveOutputPath::As(out)) => Self::from_file_on_disk(path, &out),
+                Some(ArchiveOutputPath::KeepChildren(n)) => Self::from_file_on_disk_trimmed(path, n),
+                None => Self::from_file_on_disk_trimmed(path, 1),
+            };
+            match result {
                 Ok(entry) => Ok(Entries::One(entry)),
                 Err(err) => {
-                    wrap_io_read_errors(err, "idkf", path)
+                    wrap_io_read_errors(err, function_name, path)
                 }
             }
         } else if path.is_dir() {
+            let archive_path = match out_path {
+                Some(ArchiveOutputPath::As(out)) => out,
+                Some(ArchiveOutputPath::KeepChildren(n)) => Self::trim_path_components(path, n),
+                None => Self::trim_path_components(path, 1),
+            };
+
             let mut entries = Vec::new();
-            if let Err(err) = Self::from_directory_on_disk(path, &mut entries, None, out_path) {
-                return wrap_io_read_errors(err, "idkd", path);
+            if let Err(err) = Self::from_directory_on_disk(path, &mut entries, &archive_path) {
+                return wrap_io_read_errors(err, function_name, path);
             }
             Ok(Entries::Many(entries))
         } else {
@@ -469,10 +480,10 @@ impl WrappedArchiveEntry {
         let mtime = inner.mtime();
 
         let path = Path::new(&destination);
-        if let Some(parent) = path.parent() {
-            if let Err(err) = std::fs::create_dir_all(parent) {
-                return wrap_io_read_errors_empty(err, function_name, parent);
-            }
+        if let Some(parent) = path.parent() 
+            && let Err(err) = std::fs::create_dir_all(parent)
+        {
+            return wrap_io_read_errors_empty(err, function_name, parent);
         }
 
         if let Err(err) = std::fs::write(path, data) {
@@ -684,21 +695,26 @@ fn entry_create_symlink(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueRe
 }
 
 fn entry_read(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
-    let function_name = "entry.read(path: Pathlike, as: Pathlike?)";
+    let function_name = "entry.read(path: Pathlike, as: (Pathlike | number)?)";
 
     let path = super::expect_pathlike(multivalue.pop_front(), function_name)?;
     let out_path = match multivalue.pop_front() {
         Some(LuaValue::String(s)) => {
-            let owned = s.to_string_lossy();
-            Some(PathBuf::from(owned))
+            Some(ArchiveOutputPath::As(PathBuf::from(s.to_string_lossy())))
+        },
+        Some(LuaValue::Integer(i)) => {
+            Some(ArchiveOutputPath::KeepChildren(int_to_usize(i, function_name, "as")?))
+        },
+        Some(LuaValue::Number(f)) => {
+            Some(ArchiveOutputPath::KeepChildren(float_to_usize(f, function_name, "as")?))
         },
         Some(LuaNil) | None => None,
         Some(other) => {
-            return wrap_err!("{}: expected as to be a string, got: {:?}", function_name, other);
+            return wrap_err!("{}: expected as to be a string or number, got: {:?}", function_name, other);
         }
     };
 
-    WrappedArchiveEntry::from_path_on_disk(Path::new(&path), out_path.as_deref())?.into_value(luau)
+    WrappedArchiveEntry::from_path_on_disk(Path::new(&path), out_path)?.into_value(luau)
 }
 
 pub fn create(luau: &Lua) -> LuaResult<LuaTable> {

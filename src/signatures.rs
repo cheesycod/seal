@@ -21,7 +21,7 @@ pub const STD_ARCHIVE_DEB_READFILE: &std::ffi::CStr = c"archive.deb.readfile(pat
 pub const STD_ARCHIVE_DEB_WRITEFILE: &std::ffi::CStr = c"archive.deb.writefile(path: string, archive: Archive, options: ArchiveOptions?)";
 
 // archive.entry
-pub const STD_ARCHIVE_ENTRY_READ: &std::ffi::CStr = c"archive.entry.read(path: string, as: string?) -> ArchiveEntry | { [number]: ArchiveEntry }";
+pub const STD_ARCHIVE_ENTRY_READ: &std::ffi::CStr = c"archive.entry.read(path: string, as_archive_path: string | number?) -> ArchiveEntry | { [number]: ArchiveEntry }";
 
 // archive.entry.create
 pub const STD_ARCHIVE_ENTRY_CREATE_DIRECTORY: &std::ffi::CStr = c"archive.entry.create.directory(path: string) -> ArchiveEntryDirectory";
