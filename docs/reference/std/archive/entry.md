@@ -82,17 +82,35 @@ Call methods on this to set unix_mode and modified time.
 <h4>
 
 ```luau
-function entry.read(path: string, as: string?) -> ArchiveEntry | { ArchiveEntry },
+function entry.read(path: string, as_archive_path: (string | number)?) -> ArchiveEntry | { ArchiveEntry },
 ```
 
 </h4>
 
+<details>
+
+<summary> See the docs </summary
+
 Create an `ArchiveEntry` from existing files/directories on disk. Preserves unix permissions
 and modified time if present. Returns a single ArchiveEntry when `path` points to a file,
 or `{ ArchiveEntry }` if path points to a directory. You can pass the return of this
-directly to `Archive:append`.
+directly to `Archive:append`. Not able to create symlinks at this moment.
 
-Not able to create symlinks right now.
+By default, archive paths for files read via this function will default to just the child/basename/filename
+path component (`"./project/cache/important.json"` becomes a File with archive path `"important.json"`).
+
+To preserve directory nesting, pass a second argument `as_archive_path`.
+
+If `as_archive_path` is specified,
+
+- files will use it as an **explicit path** (`as_archive_path: "cache/important.json"`),
+- directories will have each of their **children's names joined** to it
+(`as_archive_path: "cache" ->`"cache/important.json")
+
+If `as_archive_path` is a number, **keeps the last child components** of the path instead of only the filename.
+(`entry.read("./src/main.luau", 2)` gives File with archive path `src/main.luau`).
+
+</details>
 
 ---
 
