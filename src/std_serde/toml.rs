@@ -108,7 +108,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
 fn toml_to_luau(luau: &Lua, value: TomlValue) -> LuaValueResult {
     match value {
         TomlValue::String(s) => Ok(LuaValue::String(luau.create_string(&s)?)),
-        TomlValue::Integer(i) => Ok(LuaValue::Integer(i)),
+        TomlValue::Integer(i) => Ok(LuaValue::Integer(i as LuaInteger)),
         TomlValue::Float(f) => Ok(LuaValue::Number(f)),
         TomlValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
         TomlValue::Datetime(dt) => Ok(LuaValue::String(luau.create_string(dt.to_string())?)),
@@ -132,7 +132,7 @@ fn toml_to_luau(luau: &Lua, value: TomlValue) -> LuaValueResult {
 fn luau_to_toml(value: LuaValue, function_name: &'static str) -> LuaResult<TomlValue> {
     let toml_value = match value {
         LuaValue::String(s) => TomlValue::String(s.to_string_lossy()),
-        LuaValue::Integer(i) => TomlValue::Integer(i),
+        LuaValue::Integer(i) => TomlValue::Integer(int_to_i64(i)),
         LuaValue::Number(n) => TomlValue::Float(n),
         LuaValue::Boolean(b) => TomlValue::Boolean(b),
         LuaValue::Table(t) => {

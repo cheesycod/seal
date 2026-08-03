@@ -263,7 +263,7 @@ fn fs_path_parent(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
     let n_parents = match multivalue.pop_front() {
         Some(n) => {
             match n {
-                LuaValue::Integer(n) => n,
+                LuaValue::Integer(n) => int_to_i64(n),
                 LuaValue::Number(f) => {
                     return wrap_err!("path.parent(path: string, n: number?) expected n to be a whole number/integer, got float {}", f);
                 }

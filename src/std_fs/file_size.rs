@@ -215,7 +215,7 @@ impl LuaUserData for FileSize {
             }
         });
         methods.add_method("as_bytes", |_luau, this, _: ()| {
-            Ok(LuaValue::Integer(this.inner_bytes as i64))
+            Ok(LuaValue::Integer(this.inner_bytes as LuaInteger))
         });
         methods.add_method("as_kilobytes", |_luau, this, _: ()| {
             Ok(LuaValue::Number(this.inner_bytes as f64 / KILOBYTE as f64))

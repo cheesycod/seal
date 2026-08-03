@@ -417,7 +417,7 @@ fn datetime_parse(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
 fn datetime_from(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
     let function_name = "datetime.from(timestamp: number, timezone: string?, nanos: number?)";
     let timestamp = match multivalue.pop_front() {
-        Some(LuaValue::Integer(i)) => i,
+        Some(LuaValue::Integer(i)) => int_to_i64(i),
         Some(LuaNil) | None => {
             return wrap_err!("{} expected timestamp to be an integer number, got nothing or nil", function_name);
         },
@@ -480,7 +480,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             let function_name = "datetime.years(years: number)";
             let months = match multivalue.pop_front() {
                 Some(LuaValue::Number(f)) => f as i64,
-                Some(LuaValue::Integer(i)) => i,
+                Some(LuaValue::Integer(i)) => int_to_i64(i),
                 other => {
                     return wrap_err!("{} expected years to be an integer number, got: {:?}", function_name, other);
                 }
@@ -506,7 +506,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             let function_name = "time.months(months: number)";
             let months = match multivalue.pop_front() {
                 Some(LuaValue::Number(f)) => f as i64,
-                Some(LuaValue::Integer(i)) => i,
+                Some(LuaValue::Integer(i)) => int_to_i64(i),
                 other => {
                     return wrap_err!("{} expected days to be an integer number, got: {:?}", function_name, other);
                 }
@@ -532,7 +532,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             let function_name = "time.days(d: number)";
             let days = match value {
                 LuaValue::Number(f) => f as i64,
-                LuaValue::Integer(i) => i,
+                LuaValue::Integer(i) => int_to_i64(i),
                 other => {
                     return wrap_err!("{} expected days to be an integer number, got: {:?}", function_name, other);
                 }
@@ -543,7 +543,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             let function_name = "time.hours(hours: number)";
             let days = match value {
                 LuaValue::Number(f) => f as i64,
-                LuaValue::Integer(i) => i,
+                LuaValue::Integer(i) => int_to_i64(i),
                 other => {
                     return wrap_err!("{} expected hours to be an integer number, got: {:?}", function_name, other);
                 }
@@ -554,7 +554,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             let function_name = "time.minutes(minutes: number)";
             let days = match value {
                 LuaValue::Number(f) => f as i64,
-                LuaValue::Integer(i) => i,
+                LuaValue::Integer(i) => int_to_i64(i),
                 other => {
                     return wrap_err!("{} expected minutes to be an integer number, got: {:?}", function_name, other);
                 }
@@ -565,7 +565,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             let function_name = "time.seconds(seconds: number)";
             let days = match value {
                 LuaValue::Number(f) => f as i64,
-                LuaValue::Integer(i) => i,
+                LuaValue::Integer(i) => int_to_i64(i),
                 other => {
                     return wrap_err!("{} expected seconds to be an integer number, got: {:?}", function_name, other);
                 }

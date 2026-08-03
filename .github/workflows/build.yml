@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:  # manual triggering
+  workflow_call:  # so release.yml can reuse this build matrix
+    outputs:
+      version:
+        description: "seal version read from Cargo.toml"
+        value: ${{ jobs.version.outputs.version }}
 
 jobs:
   version: # credit to lune
@@ -14,25 +19,24 @@ jobs:
       version: ${{ steps.get_version.outputs.value }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Get version from manifest
-        uses: SebRollen/toml-action@v1.2.0
         id: get_version
-        with:
-          file: Cargo.toml
-          field: package.version
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "value=$version" >> "$GITHUB_OUTPUT"
 
   build:
     needs: ["version"]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest, windows-11-arm]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
@@ -86,7 +90,57 @@ jobs:
 
       - name: Upload artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: seal-v${{ needs.version.outputs.version }}-${{ runner.os == 'macOS' && 'macos-darwin' || runner.os == 'Windows' && 'windows' || runner.os == 'Linux' && 'linux' }}-${{ runner.arch == 'X64' && 'x64' || runner.arch == 'ARM64' && 'arm64' }}
           path: ./target/release/seal*
+
+  build-android:
+    needs: ["version"]
+    name: build (android-${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow-failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            arch: arm64
+            target: aarch64-linux-android
+            allow-failure: false
+          - abi: armeabi-v7a
+            arch: armv7
+            target: armv7-linux-androideabi
+            allow-failure: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build project for Android
+        env:
+          # the `cc` crate (used by mluau/luau0-src to compile Luau's C++ VM) defaults to linking
+          # c++_shared on Android; override to c++_static so the binary doesn't need
+          # libc++_shared.so present at runtime (-static-libstdc++ doesn't work here since that only
+          # affects clang's own default stdlib choice, not this explicit -l directive from `cc`).
+          # c++_static only provides the STL; the low-level Itanium C++ ABI runtime (RTTI, __cxa_*,
+          # exception vtables) lives in a separate libc++abi.a that's bundled into libc++_shared.so
+          # but must be linked explicitly here, hence the extra -lc++abi below.
+          CXXSTDLIB: "c++_static"
+          RUSTFLAGS: "-C link-arg=-lc++abi"
+        run: cargo ndk -t ${{ matrix.abi }} -P 24 build --release
+
+      - name: Upload artifacts
+        if: success()
+        uses: actions/upload-artifact@v5
+        with:
+          name: seal-v${{ needs.version.outputs.version }}-android-${{ matrix.arch }}
+          path: ./target/${{ matrix.target }}/release/seal

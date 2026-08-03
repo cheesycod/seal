@@ -210,7 +210,7 @@ fn fs_file_try_readbytes(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaMultiR
         };
 
         let file_offset = match multivalue.pop_front() {
-            Some(LuaValue::Integer(n)) => n,
+            Some(LuaValue::Integer(n)) => int_to_i64(n),
             Some(LuaValue::Number(f)) => try_truncate_f64(f, "file_offset")?,
             Some(LuaNil) | None => 0,
             Some(other) => {
@@ -219,7 +219,7 @@ fn fs_file_try_readbytes(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaMultiR
         };
 
         let count = match multivalue.pop_front() {
-            Some(LuaValue::Integer(n)) => Some(n),
+            Some(LuaValue::Integer(n)) => Some(int_to_i64(n)),
             Some(LuaValue::Number(f)) => Some(try_truncate_f64(f, "count")?),
             Some(LuaNil) | None => None,
             Some(other) => {
@@ -236,7 +236,7 @@ fn fs_file_try_readbytes(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaMultiR
         };
 
         let buffer_offset = match multivalue.pop_front() {
-            Some(LuaValue::Integer(n)) => n,
+            Some(LuaValue::Integer(n)) => int_to_i64(n),
             Some(LuaValue::Number(f)) => try_truncate_f64(f, "buffer_offset")?,
             Some(LuaNil) | None => 0,
             Some(other) => {

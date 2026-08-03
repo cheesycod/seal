@@ -543,7 +543,7 @@ impl Stream {
                     return Ok(LuaValue::Integer(0))
                 } else if target_offset + bytes_read.len() <= buffy.len() { // should've already been checked by precondition above but why not check again in case smth changed
                     buffy.write_bytes(target_offset, &bytes_read);
-                    let byte_count: i64 = match bytes_read.len().try_into() {
+                    let byte_count: LuaInteger = match bytes_read.len().try_into() {
                         Ok(i) => i,
                         Err(_) => {
                             return wrap_err!("{}: cannot convert the number of bytes read (usize) into i64");
@@ -850,7 +850,7 @@ impl Stream {
                     let function_name = "ChildProcessStream:len()";
                     match stream_cell.try_borrow_mut() {
                         Ok(ref mut stream) => {
-                            Ok(LuaValue::Integer(stream.len()? as i64))
+                            Ok(LuaValue::Integer(stream.len()? as LuaInteger))
                         },
                         Err(_) => wrap_err!("{}: stream already borrowed", function_name),
                     }
@@ -862,7 +862,7 @@ impl Stream {
                     let function_name = "ChildProcessStream:capacity()";
                     match stream_cell.try_borrow_mut() {
                         Ok(ref mut stream) => {
-                            Ok(LuaValue::Integer(stream.capacity() as i64))
+                            Ok(LuaValue::Integer(stream.capacity() as LuaInteger))
                         },
                         Err(_) => wrap_err!("{}: stream already borrowed", function_name),
                     }

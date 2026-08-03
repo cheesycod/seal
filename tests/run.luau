@@ -64,6 +64,7 @@ local function new_test_queue(): { string }
             and not str.startswith(path, "./tests/luau/std/io/prompts") -- all of these require rawmode or smth
     end)
     table.insert(file_list, "./tests/scripts/seal_setup_test.luau")
+    table.insert(file_list, "./tests/scripts/thirty_two_bit_support.luau")
     return file_list
 end
 

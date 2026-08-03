@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  workflow_dispatch:  # manual triggering only - never automatic
+
+jobs:
+  check-branch:
+    name: Ensure running from main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify ref is main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Releases must be built from main (got ${{ github.ref }}). Re-run workflow_dispatch with main selected as the branch."
+            exit 1
+          fi
+
+  build:
+    name: Build all targets
+    needs: ["check-branch"]
+    uses: ./.github/workflows/build.yml
+
+  release:
+    name: Package and draft release
+    needs: ["build"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: ./release-artifacts
+
+      - name: Bootstrap seal from the freshly-built linux-x64 artifact
+        run: chmod +x ./release-artifacts/seal-v${{ needs.build.outputs.version }}-linux-x64/seal
+
+      - name: Run release script
+        env:
+          SEAL_RELEASE_VERSION: ${{ needs.build.outputs.version }}
+          SEAL_ARTIFACTS_DIR: ${{ github.workspace }}/release-artifacts
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./release-artifacts/seal-v${{ needs.build.outputs.version }}-linux-x64/seal ./src/scripts/release.luau

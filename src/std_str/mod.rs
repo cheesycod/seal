@@ -598,7 +598,7 @@ fn str_graphemes(luau: &Lua, value: LuaValue) -> LuaValueResult {
             return Ok(LuaMultiValue::from_vec(vec![LuaNil]));
         };
 
-        let current_byte_for_luau = match i64::try_from(current_byte) {
+        let current_byte_for_luau = match LuaInteger::try_from(current_byte) {
             Ok(i) => i + 1, // we want to align start with string.sub start in luau
             Err(_) => {
                 return wrap_err!("{}: usize too big to fit in i64 :(", function_name)
@@ -833,7 +833,7 @@ fn resolve_sub_range(start: i64, end: i64, len: usize) -> (usize, usize) {
 fn pop_optional_index(multivalue: &mut LuaMultiValue, function_name: &'static str, parameter_name: &'static str, default: i64) -> LuaResult<i64> {
     match multivalue.pop_front() {
         Some(LuaNil) | None => Ok(default),
-        Some(LuaValue::Integer(n)) => Ok(n),
+        Some(LuaValue::Integer(n)) => Ok(int_to_i64(n)),
         Some(LuaValue::Number(n)) => Ok(n as i64),
         Some(other) => {
             wrap_err!("{}: expected {} to be a number or nil, got: {:?}", function_name, parameter_name, other)

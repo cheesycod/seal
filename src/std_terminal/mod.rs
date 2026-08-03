@@ -189,7 +189,7 @@ fn terminal_scroll(luau: &Lua, value: LuaValue) -> LuaValueResult {
     
     let delta = match value {
         LuaValue::Number(f) => ScrollDirection::from_i64(f.round() as i64), // as cast should safely saturate i64 not panic here
-        LuaValue::Integer(i) => ScrollDirection::from_i64(i),
+        LuaValue::Integer(i) => ScrollDirection::from_i64(int_to_i64(i)),
         other => {
             return wrap_err!("{} expected lines to be a number; negative whole numbers scroll up, positive whole numbers scroll down; got {:?}", function_name, other);
         }
