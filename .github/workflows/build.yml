@@ -90,3 +90,43 @@ jobs:
         with:
           name: seal-v${{ needs.version.outputs.version }}-${{ runner.os == 'macOS' && 'macos-darwin' || runner.os == 'Windows' && 'windows' || runner.os == 'Linux' && 'linux' }}-${{ runner.arch == 'X64' && 'x64' || runner.arch == 'ARM64' && 'arm64' }}
           path: ./target/release/seal*
+
+  build-android:
+    needs: ["version"]
+    name: build (android-${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow-failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            arch: arm64
+            target: aarch64-linux-android
+            allow-failure: false
+          - abi: armeabi-v7a
+            arch: armv7
+            target: armv7-linux-androideabi
+            allow-failure: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build project for Android
+        run: cargo ndk -t ${{ matrix.abi }} -p 24 build --release
+
+      - name: Upload artifacts
+        if: success()
+        uses: actions/upload-artifact@v5
+        with:
+          name: seal-v${{ needs.version.outputs.version }}-android-${{ matrix.arch }}
+          path: ./target/${{ matrix.target }}/release/seal
