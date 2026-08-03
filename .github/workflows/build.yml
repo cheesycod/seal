@@ -125,8 +125,12 @@ jobs:
           # the `cc` crate (used by mluau/luau0-src to compile Luau's C++ VM) defaults to linking
           # c++_shared on Android; override to c++_static so the binary doesn't need
           # libc++_shared.so present at runtime (-static-libstdc++ doesn't work here since that only
-          # affects clang's own default stdlib choice, not this explicit -l directive from `cc`)
+          # affects clang's own default stdlib choice, not this explicit -l directive from `cc`).
+          # c++_static only provides the STL; the low-level Itanium C++ ABI runtime (RTTI, __cxa_*,
+          # exception vtables) lives in a separate libc++abi.a that's bundled into libc++_shared.so
+          # but must be linked explicitly here, hence the extra -lc++abi below.
           CXXSTDLIB: "c++_static"
+          RUSTFLAGS: "-C link-arg=-lc++abi"
         run: cargo ndk -t ${{ matrix.abi }} -P 24 build --release
 
       - name: Upload artifacts
