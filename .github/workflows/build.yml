@@ -14,10 +14,10 @@ jobs:
       version: ${{ steps.get_version.outputs.value }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Get version from manifest
-        uses: SebRollen/toml-action@v1.2.0
+        uses: SebRollen/toml-action@v1.2.1
         id: get_version
         with:
           file: Cargo.toml
@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
@@ -86,7 +86,7 @@ jobs:
 
       - name: Upload artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: seal-v${{ needs.version.outputs.version }}-${{ runner.os == 'macOS' && 'macos-darwin' || runner.os == 'Windows' && 'windows' || runner.os == 'Linux' && 'linux' }}-${{ runner.arch == 'X64' && 'x64' || runner.arch == 'ARM64' && 'arm64' }}
           path: ./target/release/seal*
