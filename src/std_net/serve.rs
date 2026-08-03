@@ -35,7 +35,9 @@ fn server_serve(luau: &Lua, serve_config: LuaValue) -> LuaValueResult {
 
     let handler_function = match config.raw_get("handler") {
         Ok(LuaValue::Function(f)) => f,
-        Ok(LuaValue::Table(_handles)) => todo!(),
+        Ok(LuaValue::Table(_handles)) => {
+            return wrap_err!("server.serve: table handlers (route tables) are not yet supported, pass a single function as the handler instead");
+        }
         Ok(other) => {
             return wrap_err!("server.serve expected handler to be a function, got: {:#?}", other);
         }

@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:  # manual triggering
+  workflow_call:  # so release.yml can reuse this build matrix
+    outputs:
+      version:
+        description: "seal version read from Cargo.toml"
+        value: ${{ jobs.version.outputs.version }}
 
 jobs:
   version: # credit to lune
