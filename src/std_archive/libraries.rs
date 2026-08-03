@@ -4,6 +4,8 @@ use crate::prelude::*;
 use archive::ArchiveFormat;
 use pastey::paste;
 
+use super::compression_level::ArchiveCompressionLevel;
+
 // me: seal doesn't use advanced rust features
 // also me:
 
@@ -35,6 +37,7 @@ macro_rules! marco {
                         .with_function_and_signature("writefile", Self::writefile, signatures::[<STD_ARCHIVE_ $lib:upper _WRITEFILE>])?
                         .with_function_and_signature("load", Self::load, signatures::[<STD_ARCHIVE_ $lib:upper _LOAD>])?
                         .with_function_and_signature("create", super::archive_create, signatures::[<STD_ARCHIVE_ $lib:upper _CREATE>])?
+                        .with_value("compression", ArchiveCompressionLevel::constructor_for_format(luau, $format)?)?
                         .build_readonly()
                 }
             }
@@ -75,6 +78,7 @@ macro_rules! tars {
                         .with_function_and_signature("writefile", Self::writefile, signatures::[<STD_ARCHIVE_TAR_ $lib:upper _WRITEFILE>])?
                         .with_function_and_signature("load", Self::load, signatures::[<STD_ARCHIVE_TAR_ $lib:upper _LOAD>])?
                         .with_function_and_signature("create", super::archive_create, signatures::[<STD_ARCHIVE_TAR_ $lib:upper _CREATE>])?
+                        .with_value("compression", ArchiveCompressionLevel::constructor_for_format(luau, $format)?)?
                         .build_readonly()
                 }
             }

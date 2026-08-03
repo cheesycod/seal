@@ -105,6 +105,7 @@ fn get_standard_library(luau: &Lua, path: String) -> LuaValueResult {
         "@std/net/websocket" => ok_table(std_net::websocket::create(luau)),
 
         "@std/archive" => ok_table(std_archive::create(luau)),
+        "@std/archive/entry" => ok_table(std_archive::entry::create(luau)),
         "@std/archive/zip" => ok_table(std_archive::libraries::Zip::create(luau)),
         "@std/archive/tar" => ok_table(std_archive::libraries::Tar::create(luau)),
         "@std/archive/ar" => ok_table(std_archive::libraries::Ar::create(luau)),
@@ -246,6 +247,7 @@ pub fn get_chunk_name_for_module(path: &str, function_name: &'static str) -> Lua
     if path.is_file() && path.exists() && let Some(path) = path.to_str() {
         Ok(Some(normalize_path(path)))
     } else if path.is_dir() {
+        #[allow(clippy::disallowed_methods, reason = "child is a literal that doesn't start with an absolute path separator")]
         let possible_init_path = path.join("init.luau");
         if possible_init_path.exists() && let Some(init_path) = possible_init_path.to_str() {
             Ok(Some(normalize_path(init_path)))

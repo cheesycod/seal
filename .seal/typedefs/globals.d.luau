@@ -99,57 +99,6 @@ declare extern type interrupt with
     code: "CtrlC" | "CtrlD"
 end
 
--- type ArchiveFile = {
---     type: "File",
---     path: string,
---     content: string,
---     --- Unix permission bits (unix_mode, like `0o755`) if present
---     mode: number?,
---     --- Last modified time
---     mtime: DateTime?,
--- }
--- type ArchiveDirectory = {
---     type: "Directory",
---     path: string,
---     --- Unix permission bits (unix_mode, like `0o755`) if present
---     mode: number?,
---     --- Last modified time
---     mtime: DateTime?,
--- }
--- type ArchiveSymlink = {
---     type: "Symlink",
---     path: string,
---     target: string,
---     --- Unix permission bits (unix_mode, like `0o755`) if present
---     mode: number?,
---     --- Last modified time if present
---     mtime: DateTime?,
--- }
-
--- type ArchiveEntry =
---     | ArchiveFile
---     | ArchiveDirectory
---     | ArchiveSymlink
-
---[=[
-    Info about a specific ArchiveEntry without the entry's contents.
-
-    This exists so you don't have to allocate an entire ArchiveEntry if you're
-    just looping over all entries.
-]=]
-type ArchiveEntryInfo = {
-    type: "File" | "Directory" | "Symlink",
-    path: string,
-    --- Only present when `type == "Symlink"`.
-    target: string?,
-    --- Only present when `type == "File"`: the size of the file's contents.
-    size: FileSize?,
-    --- Unix permission bits (e.g. `0o644`), if the source format recorded them.
-    mode: number?,
-    --- Last-modified time, if the source format recorded one.
-    mtime: DateTime?,
-}
-
 type ContainerFormat =
     | "Zip"
     | "Tar"
@@ -176,40 +125,137 @@ type ArchiveOptions = {
     max_total_size: FileSize?,
     allow_symlinks: boolean?,
     allow_unsafe_path_traversals: boolean?,
+    compression_level: CompressionLevel?,
 }
 
+--[=[
+    Represents an individual entry in an `Archive`.
+
+    Right now, the 3 supported kinds of entries are Files, Directories, and Symlinks.
+]=]
 declare extern type ArchiveEntry with
     type: "File" | "Directory" | "Symlink"
+    --[=[
+        A non-unique string identifier for the entry within the archive.
+
+        Archive paths don't necessarily correspond to filesystem paths, and could be an arbitrary string.
+    ]=]
     function path(self): string
-    function set_path(self): ()
+    --[=[
+        Change the `path` of this entry in-place.
+    ]=]
+    function set_path(self, path: string): ()
+    --[=[
+        Gets the last modified time (mtime) of this entry, if present.
+    ]=]
     function modified(self): DateTime?
+    --[=[
+        Set the last modified time (mtime) of this entry.
+    ]=]
     function set_modified(self, dt: DateTime): ()
+    --[=[
+        Gets the unix permission bits (mode) of this entry, if present.
+    ]=]
     function unix_mode(self): number?
+    --[=[
+        Set the unix permission bits (mode) of this entry, if present.
+    ]=]
     function set_unix_mode(self, mode: number): ()
+    --[=[
+        If this entry represents a File, gets the file's contents' size as
+        a `FileSize` instance (from @std/fs/filesize).
+
+        Returns `nil` if this entry doesn't represent a File.
+    ]=]
     function size(self): FileSize?
 
+    --[=[
+        Narrow this into an `ArchiveEntryFile` if this entry represents a File.
+    ]=]
     function as_file(self): ArchiveEntryFile?
+    --[=[
+        Expect/assert that this entry should be an `ArchiveEntryFile`, throwing an error if it isn't.
+    ]=]
     function expect_file(self): ArchiveEntryFile
 
+    --[=[
+        Narrow this into an `ArchiveEntryDirectory` if this entry represents a Directory.
+    ]=]
     function as_directory(self): ArchiveEntryDirectory?
+    --[=[
+        Expect/assert that this entry should be an `ArchiveEntryDirectory`, throwing an error if it isn't.
+    ]=]
     function expect_directory(self): ArchiveEntryDirectory
 
+    --[=[
+        Narrow this into an `ArchiveEntrySymlink` if this entry represents a Symlink.
+    ]=]
     function as_symlink(self): ArchiveEntrySymlink?
+    --[=[
+        Expect/assert that this entry should be an `ArchiveEntrySymlink`, throwing an error if it isn't.
+    ]=]
     function expect_symlink(self): ArchiveEntrySymlink
+    --[=[
+        Returns a human-readable summary of this entry, in the format
+        `ArchiveEntry<File: "dir/hello.txt", 20.23 MB, modified: 2025-08-18 18:20 [CDT]>`.
+
+        Used automatically by `print`/`pp` when displaying an `ArchiveEntry`.
+    ]=]
+    function display(self): string
 end
 
+--[=[
+    A regular file, or rarely, a special file (such as a char/block device, FIFO, socket, etc.) mistakenly
+    caught as a regular file. 7z symlinks also appear as `ArchiveEntryFile` due to a limitation in an underlying
+    dependency.
+]=]
 declare extern type ArchiveEntryFile extends ArchiveEntry with
     type: "File"
+    --[=[
+        Copies file's contents into a new string exposed to Luau.
+    ]=]
     function contents(self): string
+    --[=[
+        Changes the file's contents in-place to the provided string or buffer.
+    ]=]
     function replace_contents(self, contents: string | buffer): ()
+    --[=[
+        Gets the size of this entry's `:contents()` as a `FileSize`
+        instance (from @std/fs/filesize).
+    ]=]
     function size(self): FileSize
+    --[=[
+        Compresses this entry into a buffer using a `SingleFileFormat` codec,
+        such as `Gzip`, `Zst`, etc.
+    ]=]
     function compress(self, format: SingleFileFormat): buffer
+    --[=[
+        Writes this file's contents straight to `destination` on disk (creating parent
+        directories as needed), applying this entry's mode and mtime if present.
+
+        Unlike `:contents()`, this never copies the file's data into a Luau string/buffer.
+    ]=]
+    function extract(self, destination: string): ()
 end
 
+--[=[
+    A directory in an archive can basically just represent an empty directory,
+    you don't need an `ArchiveEntryDirectory` if you have file paths within the directory.
+]=]
 declare extern type ArchiveEntryDirectory extends ArchiveEntry with
     type: "Directory"
 end
 
+--[=[
+    A symlink points from place A (`path`) to place B (`target`). 
+    Symlinks within Archives should point within the same archive,
+    otherwise we throw unsafe_path_traversal errors (which you can disable).
+
+    7z symlinks are incorrectly caught as `ArchiveEntryFile` instead of this due to a limitation in
+    a dependency.
+
+    Hardlinks are also caught as `ArchiveEntrySymlink`s.
+]=]
 declare extern type ArchiveEntrySymlink extends ArchiveEntry with
     type: "Symlink"
     function target(self): string
@@ -217,12 +263,11 @@ declare extern type ArchiveEntrySymlink extends ArchiveEntry with
 end
 
 --[=[
-    Represents any compressed archive (tar.gz, zip file, 7z, debian packages/etc.)
+    Represents any compressed archive (tar.gz, Zip file, 7z, Debian packages/etc.)
 
     The `Archive` type itself is format-agnostic and can be re-saved in a different format.
 
-    To see what's in the archive, try printing it or calling `:paths()` or `:info(path)` on specific paths
-    or indices.
+    To see what's in the archive, for loop it, try printing it, or call`:paths()`.
 
     To get the length of an archive, just use `#archive`.
 
@@ -230,30 +275,43 @@ end
     with the same path (unlike a real filesystem). Attackers have been known to exploit that before.
 ]=]
 declare extern type Archive with
+    --[=[
+        Returns a list of paths in the archive; use indices to pass into `Archive:get` or `Archive:remove`.
+
+        Keep in mind that an archive may contain duplicate paths or paths that don't follow filesystem
+        path conventions and cannot be written to disk.
+    ]=]
     function paths(self): { string }
     --[=[
-        Gets all the info (including content) for the `ArchiveEntry` at the specified index or path.
+        If passed an index, gets the `ArchiveEntry` at a specific index in the archive.
+        If passed a path, gets the first `ArchiveEntry` with the requested path.
+        
+        Returns `nil` if no entry matching `path_or_index` is found in the archive.
 
         If a path is specified (a string), gets the first entry with that path. Prefer using indices
         instead of paths unless you know all paths are unique.
     ]=]
     function get(self, path_or_index: string | number): ArchiveEntry?
     --[=[
-        Gets an entry's metadata (path, type, unix mode, mtime) without allocating the entire file's contents.
+        If passed an index, gets the `ArchiveEntry` at a specific index in the archive.
+        If passed a path, gets the first `ArchiveEntry` with the requested path.
+
+        Unlike `Archive:get`, throws an error instead of returning `nil` if no entry matching `path_or_index`
+        is found in the archive.
     ]=]
-    function info(self, path_or_index: string | number): ArchiveEntryInfo?
+    function expect(self, path_or_index: string | number): ArchiveEntry
     --[=[
-        Adds a single `ArchiveEntry` table to an existing archive in place with similar semantics to `table.insert`.
-        You can pass paths to existing files on disk instead of constructing ArchiveEntry tables.
+        Adds a single `ArchiveEntry` to an existing archive in place with similar semantics to `table.insert`.
+        Create entries from `@std/archive/entry`.
     ]=]
     function insert(self, index: number, entry: ArchiveEntry | string)
     --[=[
         Adds one or more entries to the back of an archive.
-        You can pass paths to existing files on disk instead of constructing ArchiveEntry tables.
+        Create entries from `@std/archive/entry`.
     ]=]
-    function append(self, entry: ArchiveEntry | string, ...: ArchiveEntry | string)
+    function append(self, entry: ArchiveEntry | { ArchiveEntry }, ...: ArchiveEntry | { ArchiveEntry })
     --[=[
-        Removes the `ArchiveEntry` element by index, shuffling all remaining entries to the front.
+        Removes the `ArchiveEntry` element by index, pulling all remaining entries towards the front.
 
         This function only takes an index because an archive can contain multiple identical paths
         and removal by path would therefore be a footgun.
@@ -266,10 +324,43 @@ declare extern type Archive with
 
         You can just save this via `fs.readfile`. You could also use any archive library's
         writefile function to write this directly to disk without needing to create an additional buffer.`
+
+        If you just want to take an existing archive that exists on disk and extract it, use one of
+        the archive libraries' extract functions instead (`archive.extract`/etc. stream directly to disk
+        without as many allocations).
     ]=]
     function serialize(self, format: ArchiveFormat, options: ArchiveOptions?): buffer
+    --[=[
+        Extract this archive into the directory at `destination`, creating a new directory there if needed.
+
+        If this archive represents a single file in a compressed-file format, you probably want to get the
+        first entry and `fs.writefile` its `:contents()` instead (this function will make a new directory
+        at `destination` and put the file in there).
+    ]=]
+    function extract(self, destination: string, options: ArchiveOptions?)
 
     function __len(self): number
+    function __iter(self): () -> (number, ArchiveEntry)
+end
+
+--[=[
+    Compression options for Zip (Deflate), Gzip, Bz2, Xz, Zstd, and Lz4-compressed archives.
+
+    You can create these by calling the `.compression` functions on relevant `@std/archive` libraries.
+
+    Passing a compression level that is inapplicable for the requested format or one that's out of range
+    for that compression codec will throw a runtime error upon write/serialization.
+]=]
+declare extern type CompressionLevel with
+    --[=[
+        Which compression codec this `CompressionLevel` refers to.
+    ]=]
+    function name(self): string
+    --[=[
+        The compression level (if the codec supports one)
+    ]=]
+    function level(self): number?
+    function __tostring(self): string
 end
 
 --[=[

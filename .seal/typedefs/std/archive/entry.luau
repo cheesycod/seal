@@ -4,7 +4,7 @@ export type entry = {
         directory: (path: string) -> ArchiveEntryDirectory,
         symlink: (path: string, target: string) -> ArchiveEntrySymlink,
     },
-    from: (path: string, as: string) -> ArchiveEntry,
+    read: (path: string, as: string?) -> ArchiveEntry | { ArchiveEntry },
 }
 
 return {} :: entry

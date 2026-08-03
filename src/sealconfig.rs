@@ -16,18 +16,27 @@ impl SealConfig {
         let mut current_path = current_path.unwrap_or(std_env::get_cwd(function_name)?);
 
         while current_path.exists() {
-            let seal_dir = current_path.join(".seal");
-            let config_path = seal_dir.join("config.luau");
+            #[allow(clippy::disallowed_methods, reason = "both paths are non-absolute literals")]
+            let (seal_dir, config_path) =
+            {
+                let seal_dir = current_path.join(".seal");
+                let config_path = seal_dir.join("config.luau");
+                (seal_dir, config_path)
+            };
 
             if seal_dir.is_dir() && config_path.is_file() {
                 current_path = config_path;
                 break;
             } else if seal_dir.is_dir() && !config_path.exists() {
-                if std_env::get_cwd(function_name)?
+                #[allow(clippy::disallowed_methods, reason = "both paths are non-absolute literals")]
+                let cwd_joined_exists = {
+                    std_env::get_cwd(function_name)?
                     .join("src")
                     .join("main.luau")
                     .exists()
-                {
+                };
+                
+                if cwd_joined_exists {
                     return Ok(Some(SealConfig { entry_path: String::from("./src/main.luau"), test_path: None }))
                 } else {
                     return Ok(None);

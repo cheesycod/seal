@@ -23,12 +23,23 @@ export type sevenz = {
 
 </h4>
 
+<details>
+
+<summary> See the docs </summary
+
 Read, write, and extract the 7z format.
 
 7z (LZMA2) usually beats zip and tar.xz on compression ratio, at the cost of being slower
 to compress and less universally supported than zip.
 
-Uses LZMA2 preset 6, the same default as tar.xz. If you need a different preset, open an issue, make a PR, or contact me.
+Uses LZMA2 preset 6, the same default as tar.xz.
+There is currently no way to change its compression ratio.
+
+Although the 7z format supports symlinks and other special files, this library
+cannot handle them correctly and reads 7z symlinks as regular files with their
+target in their file contents. This is a limitation of the sevenz crate.
+
+</details>
 
 ---
 
@@ -37,7 +48,7 @@ Uses LZMA2 preset 6, the same default as tar.xz. If you need a different preset,
 <h4>
 
 ```luau
-function sevenz.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function sevenz.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -46,8 +57,11 @@ function sevenz.extract(path: string, destination: string, options: ArchiveOptio
 
 <summary> See the docs </summary
 
-Extract the 7z archive at `path` into the directory at `destination`, creating a new
+Extract the 7z archive into the directory at `destination`, creating a new
 directory if needed. This function has the same erroring semantics as `fs.writefile`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent zip bombs.

@@ -75,6 +75,18 @@ you're going to be extracting large files.
 
 ---
 
+### ArchiveOptions.compression_level
+
+<h4>
+
+```luau
+  compression_level: CompressionLevel?,
+```
+
+</h4>
+
+---
+
 ```luau
 } -- closes ArchiveOptions
 ```

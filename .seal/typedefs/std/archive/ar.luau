@@ -9,14 +9,17 @@ export type ArchiveFormat = _types.ArchiveFormat
 ]=]
 export type ar = {
     --[=[
-        Directly extract the ar archive at `path` into directory at `destination`, creating
+        Directly extract an ar archive into directory at `destination`, creating
         a new directory if needed.
+
+        `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+        Prefer passing a path on disk for performance reasons.
 
         This overwrites files in `destination` if those files existed already, but should not
         cause directory issues like overwriting a directory because `ar is a flat archive format that
         doesn't allow directories.
     ]=]
-    extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+    extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
     --[=[
         Reads the ar archive at `path` into memory as an `Archive`, with the same erroring semantics as `fs.readfile`.
 

@@ -188,9 +188,13 @@ fn env_where(luau: &Lua, value: LuaValue) -> LuaValueResult {
     let name = match value {
         LuaValue::String(s) => s.to_string_lossy(),
         other => {
-            return wrap_err!("{}: expected name to be a string, got: {:#?}", function_name, other);
+            return wrap_err!("{}: expected application name to find within $PATH to be a string, got: {:#?}", function_name, other);
         }
     };
+
+    if name.starts_with("/") {
+        return wrap_err!("{}: application name to find within $PATH starts with absolute path separator '/'; this is most likely user error", function_name);
+    }
 
     let mut found_paths: Vec<String> = Vec::new();
 
@@ -199,6 +203,7 @@ fn env_where(luau: &Lua, value: LuaValue) -> LuaValueResult {
         {
             use std::os::unix::fs::PermissionsExt;
             for dir in env::split_paths(&path_var) {
+                #[allow(clippy::disallowed_methods, reason = "Path::join is safe here; we've validated name doesn't start with /")]
                 let candidate = dir.join(&name);
                 if let Ok(metadata) = std::fs::metadata(&candidate)
                     && metadata.is_file()
@@ -216,12 +221,14 @@ fn env_where(luau: &Lua, value: LuaValue) -> LuaValueResult {
 
             for dir in env::split_paths(&path_var) {
                 if has_extension {
+                    #[allow(clippy::disallowed_methods, reason = "Path::join is safe here; we've validated name doesn't start with /")]
                     let candidate = dir.join(&name);
                     if candidate.is_file() {
                         found_paths.push(candidate.to_string_lossy().to_string());
                     }
                 } else {
                     for extension in &extensions {
+                        #[allow(clippy::disallowed_methods, reason = "Path::join is safe here; we've validated name doesn't start with /")]
                         let candidate = dir.join(format!("{}{}", name, extension));
                         if candidate.is_file() {
                             found_paths.push(candidate.to_string_lossy().to_string());

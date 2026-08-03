@@ -59,3 +59,18 @@ end), "bz2 decompress should error on non-bz2 data")
 assert(not pcall(function()
     return (bz2 :: any).compress(nil)
 end), "bz2 compress should error without content")
+
+-- the level param round-trips and a high level compresses at least as well as a low one
+const level_low = bz2.compress(repetitive, 1)
+const level_high = bz2.compress(repetitive, 9)
+assert(buffer.tostring(bz2.decompress(level_low)) == repetitive, "bz2 roundtrip with a low level failed")
+assert(buffer.tostring(bz2.decompress(level_high)) == repetitive, "bz2 roundtrip with a high level failed")
+assert(
+    buffer.len(level_high) <= buffer.len(level_low),
+    `expected bz2 level 9 to compress at least as well as level 1 ({buffer.len(level_high)} vs {buffer.len(level_low)} bytes)`
+)
+
+-- an out-of-range level is rejected, not silently clamped
+assert(not pcall(function()
+    return bz2.compress(repetitive, 15)
+end), "bz2 compress should error on an out-of-range level (15)")

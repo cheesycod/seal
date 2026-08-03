@@ -61,12 +61,12 @@ function entry.create.symlink(path: string, target: string) -> ArchiveEntrySymli
 
 ---
 
-### entry.from
+### entry.read
 
 <h4>
 
 ```luau
-function entry.from(path: string, as: string) -> ArchiveEntry,
+function entry.read(path: string, as: string?) -> ArchiveEntry | { ArchiveEntry },
 ```
 
 </h4>

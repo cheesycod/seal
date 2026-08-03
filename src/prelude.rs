@@ -49,7 +49,7 @@ pub fn ok_buffy<B: AsRef<[u8]>>(b: B, luau: &Lua) -> LuaValueResult {
     Ok(LuaValue::Buffer(luau.create_buffer(b)?))
 }
 
-pub fn ok_userdata<S: LuaUserData + Send + 'static>(u: S, luau: &Lua) -> LuaValueResult {
+pub fn ok_userdata<S: LuaUserData + 'static>(u: S, luau: &Lua) -> LuaValueResult {
     Ok(LuaValue::UserData(luau.create_userdata(u)?))
 }
 
@@ -223,6 +223,31 @@ pub fn int_to_u16(i: i64, function_name: &'static str, parameter_name: &'static 
     }
 }
 
+pub fn int_to_i32(i: i64, function_name: &'static str, parameter_name: &'static str) -> LuaResult<i32> {
+    match i32::try_from(i) {
+        Ok(i) => Ok(i),
+        Err(err) => {
+            wrap_err!("{}: {} can't safely be converted from i64 to i32 because {}", function_name, parameter_name, err)
+        }
+    }
+}
+
+/// safely convert float param to i32, giving a good error reason if conversion wasn't successful
+pub fn float_to_i32(f: f64, function_name: &'static str, parameter_name: &'static str) -> LuaResult<i32> {
+    let truncated = f.trunc();
+    if truncated.is_nan() || truncated.is_infinite() {
+        wrap_err!("{}: {} cannot be NaN nor infinite", function_name, parameter_name)
+    } else if truncated < i32::MIN as f64 || truncated > i32::MAX as f64 {
+        wrap_err!("{} expected {} to be convertible to i32, but provided float is too big to fit (got: {})", function_name, parameter_name, f)
+    } else if truncated == f {
+        // SAFETY: just checked nan/infinite/bounds right above
+        let i: i32 = unsafe { truncated.to_int_unchecked() };
+        Ok(i)
+    } else {
+        wrap_err!("{} expected {} to be an integer, unexpectedly got a float: {}", function_name, parameter_name, f)
+    }
+}
+
 /// safely convert float param to u64, giving a good error reason if conversion wasn't successful
 pub fn float_to_u64(f: f64, function_name: &'static str, parameter_name: &'static str) -> LuaResult<u64> {
     let truncated = f.trunc();
@@ -255,7 +280,15 @@ pub fn create_table_with_capacity(luau: &Lua, n_array: usize, n_records: usize) 
 pub struct UserDataTypeName {
     inner: Option<String>
 }
-impl UserDataTypeName {
+impl From<&LuaAnyUserData> for UserDataTypeName {
+    fn from(ud: &LuaAnyUserData) -> Self {
+        Self {
+            inner: ud.type_name()
+                .unwrap_or(Some("<unable to get type name>".into()))
+        }
+    }
+}
+impl From<LuaAnyUserData> for UserDataTypeName {
     fn from(ud: LuaAnyUserData) -> Self {
         Self {
             inner: ud.type_name()
@@ -263,6 +296,7 @@ impl UserDataTypeName {
         }
     }
 }
+
 impl std::fmt::Display for UserDataTypeName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.inner.as_deref().unwrap_or("<unknown userdata type>"))
@@ -272,8 +306,19 @@ pub trait Borrowable {
     fn type_name() -> &'static str;
 
     /// Borrows of Self type or gives type name for error message if it can't
+    fn as_borrowed(ud: &LuaAnyUserData) -> Result<LuaUserDataRef<Self>, UserDataTypeName>
+        where Self: LuaUserData + 'static
+    {
+        if let Ok(got_it) = ud.borrow::<Self>() {
+            Ok(got_it)
+        } else {
+            Err(UserDataTypeName::from(ud))
+        }
+    }
+
+    /// Borrows of Self type or gives type name for error message if it can't
     fn borrowed(ud: LuaAnyUserData) -> Result<LuaUserDataRef<Self>, UserDataTypeName>
-        where Self: LuaUserData
+        where Self: LuaUserData + 'static
     {
         if let Ok(got_it) = ud.borrow::<Self>() {
             Ok(got_it)
@@ -335,5 +380,14 @@ pub trait Borrowable {
             let expected = Self::type_name();
             wrap_err!("{}: expected {} to be a {} or nil, but got the wrong type of userdata: {}", function_name, parameter_name, expected, name)
         }
+    }
+
+    fn into_userdata(
+        self,
+        luau: &Lua
+    ) -> LuaValueResult
+        where Self: LuaUserData + 'static 
+    {
+        Ok(LuaValue::UserData(luau.create_userdata(self)?))
     }
 }

@@ -87,7 +87,7 @@ const archive = tar.gz.load(bytes)
 const seal_data = archive:get("seal")
 if seal_data then
     assert(seal_data.type == "File")
-    const exe_bytes = seal_data.content
+    const exe_bytes = seal_data:expect_file():contents()
     fs.writefile(temp_seal_path, exe_bytes)
     process.shell(`chmod +x {temp_seal_path}`)
     const result = process.run {

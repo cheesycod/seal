@@ -447,6 +447,10 @@ fn write_tree_rec(current_path: PathBuf, tree: LuaTable, depth: Option<i32>, fun
                 return wrap_err!("{}: when evaluating children of path '{}', expected field 'name' of table at index {} to be a string, got: {:?}", function_name, current_path.display(), index, other);
             }
         };
+        
+        if entry_name.starts_with("/") {
+            return wrap_err!("{}: 'name' in table shouldn't start with '/'", function_name);
+        }
 
         let build_type = match value.raw_get("type")? {
             LuaValue::String(ty) => {
@@ -463,6 +467,7 @@ fn write_tree_rec(current_path: PathBuf, tree: LuaTable, depth: Option<i32>, fun
             }
         };
 
+        #[allow(clippy::disallowed_methods, reason = "we've verified path doesn't start with /")]
         let new_entry_pathbuf = Path::join(&current_path, &entry_name);
 
         if build_type == "File" {

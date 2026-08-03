@@ -60,3 +60,18 @@ end), "gzip decompress should error on non-gzip data")
 assert(not pcall(function()
     return (gzip :: any).compress(nil)
 end), "gzip compress should error without content")
+
+-- the level param round-trips and a high level compresses at least as well as a low one
+const level_low = gzip.compress(repetitive, 1)
+const level_high = gzip.compress(repetitive, 9)
+assert(buffer.tostring(gzip.decompress(level_low)) == repetitive, "gzip roundtrip with a low level failed")
+assert(buffer.tostring(gzip.decompress(level_high)) == repetitive, "gzip roundtrip with a high level failed")
+assert(
+    buffer.len(level_high) <= buffer.len(level_low),
+    `expected gzip level 9 to compress at least as well as level 1 ({buffer.len(level_high)} vs {buffer.len(level_low)} bytes)`
+)
+
+-- an out-of-range level is rejected, not silently clamped
+assert(not pcall(function()
+    return gzip.compress(repetitive, 15)
+end), "gzip compress should error on an out-of-range level (15)")

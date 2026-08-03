@@ -7,7 +7,6 @@ local _types = require("./_types")
 ]=]
 export type tar = {
     --[=[
-
         Unzip/Unball(is that a word?) gzip-compressed tarballs (`.tar.gz`/`.tgz`),
         the most common type of archive on Linux and Unix-like platforms.
 
@@ -16,12 +15,15 @@ export type tar = {
 
         If you don't know who or what will need to decompress the archive, use zip or this.
 
-        Uses gzip's default compression level (6). If you need a different level, open an issue, make a PR, or contact me.
+        Uses gzip's default compression level (6), unless `ArchiveOptions.compression_level` is provided.
     ]=]
     gz: {
         --[=[
-            Extract the tar.gz archive at `path` into a new or existing directory at `destination`.
+            Extract the tar.gz archive into a new or existing directory at `destination`.
             This function has the same erroring semantics as `fs.writefile`.
+            
+            `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+            Prefer passing a path on disk for performance reasons.
 
             This protects against path traversal attacks (unexpectedly writing outside destination directory),
             symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
@@ -30,10 +32,10 @@ export type tar = {
 
             ## Errors
 
-            Throws an error if the path doesn't exist, path doesn't lead to a valid `TarGz` archive, 
+            Throws an error if the path doesn't exist, path doesn't lead to a valid `TarGz` archive,
             is permission denied, or another IO error occurs.
         ]=]
-        extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+        extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
         --[=[
             Read the tar.gz archive at `path` into memory as an `Archive` with the same erroring semantics
             as `fs.readfile`.
@@ -59,21 +61,30 @@ export type tar = {
             Create a new empty `Archive`.
         ]=]
         create: () -> Archive,
+        --[=[
+            Builds a `Gzip CompressionLevel` to use when writing or serializing tar.gz archives.
+
+            `level` must be in the range of 0 (no compression) to 9 (best); defaults to 6.
+        ]=]
+        compression: (level: number) -> CompressionLevel,
     },
     --[=[
         Plain tarball with no compression. You might be looking for `tar.gz` instead.
     ]=]
     uncompressed: {
         --[=[
-            Extract an uncompressed tar archive at `path` into a new or existing directory at `destination`.
+            Extract an uncompressed tar archive into a new or existing directory at `destination`.
             This function has the same erroring semantics as `fs.writefile`.
+
+            `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+            Prefer passing a path on disk for performance reasons.
 
             This protects against path traversal attacks (unexpectedly writing outside destination directory),
             symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
 
             To increase size limits, allow unsafe path traversals or allow symlinks, see `ArchiveOptions`.
         ]=]
-        extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+        extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
         --[=[
             Read the tar archive at `path` into memory as an `Archive` with the same erroring semantics as `fs.readfile`.
 
@@ -103,18 +114,21 @@ export type tar = {
         
         Good for release tarballs you compress once and many people decompress.
 
-        Uses xz preset 6. If you need a different preset, open an issue, make a PR, or contact me.
+        Uses xz preset 6, unless `ArchiveOptions.compression_level` is provided.
     ]=]
     xz: {
         --[=[
-            Extract the tar.xz archive at `path` into a new or existing directory at `destination`.
+            Extract the tar.xz archive into a new or existing directory at `destination`.
+
+            `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+            Prefer passing a path on disk for performance reasons.
 
             This protects against path traversal attacks (unexpectedly writing outside destination directory),
             symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
 
             To increase size limits, allow unsafe path traversals or allow symlinks, see `ArchiveOptions`.
         ]=]
-        extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+        extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
         --[=[
             Read the tar.xz archive at `path` into memory as an `Archive`.
 
@@ -135,25 +149,34 @@ export type tar = {
             Create a new empty `Archive`.
         ]=]
         create: () -> Archive,
+        --[=[
+            Builds an `Xz CompressionLevel` to use when writing or serializing tar.xz archives.
+
+            `level` is xz/LZMA2's preset and must be in the range of 0 (fastest) - 9 (best); defaults to 6.
+        ]=]
+        compression: (level: number) -> CompressionLevel,
     },
     --[=[
         lz4-compressed tarballs (`.tar.lz4`).
 
         The fastest codec here to compress and decompress but has the worst compression ratio.
         
-        Uses lz4's fast mode (level 0), not its high-compression mode. If you need high-compression
-        mode or a specific level, open an issue, make a PR, or contact me.
+        Uses lz4's fast mode (level 0), not its high-compression mode, unless `ArchiveOptions.compression_level`
+        is provided.
     ]=]
     lz4: {
         --[=[
-            Extract the tar.lz4 archive at `path` into a new or existing directory at `destination`.
+            Extract the tar.lz4 archive into a new or existing directory at `destination`.
+
+            `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+            Prefer passing a path on disk for performance reasons.
 
             This protects against path traversal attacks (unexpectedly writing outside destination directory),
             symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
 
             To increase size limits, allow unsafe path traversals or allow symlinks, see `ArchiveOptions`.
         ]=]
-        extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+        extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
         --[=[
             Read the tar.lz4 archive at `path` into memory as an `Archive`.
 
@@ -174,6 +197,12 @@ export type tar = {
             Create a new empty `Archive`.
         ]=]
         create: () -> Archive,
+        --[=[
+            Builds a `Lz4 CompressionLevel` to use when writing or serializing tar.lz4 archives.
+
+            `level` is lz4's level; must be in the range of 0 (fast mode) - 16 (best, high-compression mode); defaults to 0.
+        ]=]
+        compression: (level: number) -> CompressionLevel,
     },
     --[=[
         bzip2-compressed tarballs (`.tar.bz2`).
@@ -182,18 +211,21 @@ export type tar = {
         gzip, lz4, or zstd, and has been largely superseded by xz/zstd. Mainly useful for
         compatibility with older tooling that expects bz2.
 
-        Uses bzip2's default compression level (6). If you need a different level, open an issue, make a PR, or contact me.
+        Uses bzip2's default compression level (6), unless `ArchiveOptions.compression_level` is provided.
     ]=]
     bz2: {
         --[=[
-            Extract the tar.bz2 archive at `path` into a new or existing directory at `destination`.
+            Extract the tar.bz2 archive into a new or existing directory at `destination`.
+
+            `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+            Prefer passing a path on disk for performance reasons.
 
             This protects against path traversal attacks (unexpectedly writing outside destination directory),
             symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
 
             To increase size limits, allow unsafe path traversals or allow symlinks, see `ArchiveOptions`.
         ]=]
-        extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+        extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
         --[=[
             Read the tar.bz2 archive at `path` into memory as an `Archive`.
 
@@ -214,6 +246,12 @@ export type tar = {
             Create a new empty `Archive`.
         ]=]
         create: () -> Archive,
+        --[=[
+            Builds a `Bz2 CompressionLevel` to use when writing or serializing tar.bz2 archives.
+
+            `level` is bzip2's level and must be in the range of 1 (fastest) - 9 (best); defaults to 6.
+        ]=]
+        compression: (level: number) -> CompressionLevel,
     },
     --[=[
         Zstandard-compressed tarballs (`.tar.zst`).
@@ -229,15 +267,18 @@ export type tar = {
     ]=]
     zst: {
         --[=[
-            Extract the tar.zst archive at `path` into a new or existing directory at `destination`. Same erroring
+            Extract the tar.zst archive into a new or existing directory at `destination`. Same erroring
             semantics as `fs.writefile`.
+    
+            `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+            Prefer passing a path on disk for performance reasons.
 
             This protects against path traversal attacks (unexpectedly writing outside destination directory),
             symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
 
             To increase size limits, allow unsafe path traversals or allow symlinks, see `ArchiveOptions`.
         ]=]
-        extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+        extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
         --[=[
             Read the tar.zst archive at `path` into memory as an `Archive`.
 
@@ -258,6 +299,13 @@ export type tar = {
             Create a new empty `Archive`.
         ]=]
         create: () -> Archive,
+        --[=[
+            Builds a `Zstd CompressionLevel` for use when writing/serializing tar.zst archives.
+
+            `level` is zstd's level, -7 (fastest) - 22 (best); default is 3. 
+            Passing 0 tells zstd to use its default compression level (3).
+        ]=]
+        compression: (level: number) -> CompressionLevel,
     },
 }
 

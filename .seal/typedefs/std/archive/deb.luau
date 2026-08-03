@@ -16,11 +16,14 @@ export type deb = {
         a new directory if needed. This function has the same error throwing semantics as
         fs.writefile.
 
+        `path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+        Prefer passing a path on disk for performance reasons.
+
         This overwrites files in `destination` if those files existed already, but should not
-        cause directory issues like overwriting a directory because `ar is a flat archive format that
+        cause directory issues like overwriting a directory because this is a flat archive format that
         doesn't allow directories.
     ]=]
-    extract: (path: string, destination: string, options: ArchiveOptions?) -> (),
+    extract: (path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
     --[=[
         Reads the deb package at `path` into memory as an `Archive`, with the same erroring semantics as `fs.readfile`.
 

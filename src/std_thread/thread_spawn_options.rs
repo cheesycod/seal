@@ -73,6 +73,7 @@ impl ThreadSpawnOptions {
                         parent
                     }
                 };
+                #[allow(clippy::disallowed_methods, reason = "if path is an absolute path here it's most likely intentional and clobbering here would lead to desired behavior; keeping this unchecked for now")]
                 Some(parent_path.join(path))
             }
             LuaNil => None,

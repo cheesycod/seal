@@ -33,7 +33,7 @@ than tar.xz, zstd, and 7z.
 
 If you don't know who or what will need to decompress the archive, use zip or this.
 
-Uses gzip's default compression level (6). If you need a different level, open an issue, make a PR, or contact me.
+Uses gzip's default compression level (6), unless `ArchiveOptions.compression_level` is provided.
 
 </details>
 
@@ -44,7 +44,7 @@ Uses gzip's default compression level (6). If you need a different level, open a
 <h4>
 
 ```luau
-function tar.gz.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function tar.gz.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -53,8 +53,11 @@ function tar.gz.extract(path: string, destination: string, options: ArchiveOptio
 
 <summary> See the docs </summary
 
-Extract the tar.gz archive at `path` into a new or existing directory at `destination`.
+Extract the tar.gz archive into a new or existing directory at `destination`.
 This function has the same erroring semantics as `fs.writefile`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
@@ -135,6 +138,22 @@ Create a new empty `Archive`.
 
 ---
 
+### tar.gz.compression
+
+<h4>
+
+```luau
+function tar.gz.compression(level: number) -> CompressionLevel,
+```
+
+</h4>
+
+Builds a `Gzip CompressionLevel` to use when writing or serializing tar.gz archives.
+
+`level` must be in the range of 0 (no compression) to 9 (best); defaults to 6.
+
+---
+
 ```luau
   }, -- closes gz
 ```
@@ -160,7 +179,7 @@ Plain tarball with no compression. You might be looking for `tar.gz` instead.
 <h4>
 
 ```luau
-function tar.uncompressed.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function tar.uncompressed.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -169,8 +188,11 @@ function tar.uncompressed.extract(path: string, destination: string, options: Ar
 
 <summary> See the docs </summary
 
-Extract an uncompressed tar archive at `path` into a new or existing directory at `destination`.
+Extract an uncompressed tar archive into a new or existing directory at `destination`.
 This function has the same erroring semantics as `fs.writefile`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
@@ -264,7 +286,7 @@ gzip or zstd.
 
 Good for release tarballs you compress once and many people decompress.
 
-Uses xz preset 6. If you need a different preset, open an issue, make a PR, or contact me.
+Uses xz preset 6, unless `ArchiveOptions.compression_level` is provided.
 
 ---
 
@@ -273,7 +295,7 @@ Uses xz preset 6. If you need a different preset, open an issue, make a PR, or c
 <h4>
 
 ```luau
-function tar.xz.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function tar.xz.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -282,7 +304,10 @@ function tar.xz.extract(path: string, destination: string, options: ArchiveOptio
 
 <summary> See the docs </summary
 
-Extract the tar.xz archive at `path` into a new or existing directory at `destination`.
+Extract the tar.xz archive into a new or existing directory at `destination`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
@@ -353,6 +378,22 @@ Create a new empty `Archive`.
 
 ---
 
+### tar.xz.compression
+
+<h4>
+
+```luau
+function tar.xz.compression(level: number) -> CompressionLevel,
+```
+
+</h4>
+
+Builds an `Xz CompressionLevel` to use when writing or serializing tar.xz archives.
+
+`level` is xz/LZMA2's preset and must be in the range of 0 (fastest) - 9 (best); defaults to 6.
+
+---
+
 ```luau
   }, -- closes xz
 ```
@@ -373,8 +414,8 @@ lz4-compressed tarballs (`.tar.lz4`).
 
 The fastest codec here to compress and decompress but has the worst compression ratio.
 
-Uses lz4's fast mode (level 0), not its high-compression mode. If you need high-compression
-mode or a specific level, open an issue, make a PR, or contact me.
+Uses lz4's fast mode (level 0), not its high-compression mode, unless `ArchiveOptions.compression_level`
+is provided.
 
 ---
 
@@ -383,7 +424,7 @@ mode or a specific level, open an issue, make a PR, or contact me.
 <h4>
 
 ```luau
-function tar.lz4.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function tar.lz4.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -392,7 +433,10 @@ function tar.lz4.extract(path: string, destination: string, options: ArchiveOpti
 
 <summary> See the docs </summary
 
-Extract the tar.lz4 archive at `path` into a new or existing directory at `destination`.
+Extract the tar.lz4 archive into a new or existing directory at `destination`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
@@ -463,6 +507,22 @@ Create a new empty `Archive`.
 
 ---
 
+### tar.lz4.compression
+
+<h4>
+
+```luau
+function tar.lz4.compression(level: number) -> CompressionLevel,
+```
+
+</h4>
+
+Builds a `Lz4 CompressionLevel` to use when writing or serializing tar.lz4 archives.
+
+`level` is lz4's level; must be in the range of 0 (fast mode) - 16 (best, high-compression mode); defaults to 0.
+
+---
+
 ```luau
   }, -- closes lz4
 ```
@@ -489,7 +549,7 @@ Can beat gzip's ratio on text-heavy data, but is slower to compress and decompre
 gzip, lz4, or zstd, and has been largely superseded by xz/zstd. Mainly useful for
 compatibility with older tooling that expects bz2.
 
-Uses bzip2's default compression level (6). If you need a different level, open an issue, make a PR, or contact me.
+Uses bzip2's default compression level (6), unless `ArchiveOptions.compression_level` is provided.
 
 </details>
 
@@ -500,7 +560,7 @@ Uses bzip2's default compression level (6). If you need a different level, open 
 <h4>
 
 ```luau
-function tar.bz2.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function tar.bz2.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -509,7 +569,10 @@ function tar.bz2.extract(path: string, destination: string, options: ArchiveOpti
 
 <summary> See the docs </summary
 
-Extract the tar.bz2 archive at `path` into a new or existing directory at `destination`.
+Extract the tar.bz2 archive into a new or existing directory at `destination`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
@@ -580,6 +643,22 @@ Create a new empty `Archive`.
 
 ---
 
+### tar.bz2.compression
+
+<h4>
+
+```luau
+function tar.bz2.compression(level: number) -> CompressionLevel,
+```
+
+</h4>
+
+Builds a `Bz2 CompressionLevel` to use when writing or serializing tar.bz2 archives.
+
+`level` is bzip2's level and must be in the range of 1 (fastest) - 9 (best); defaults to 6.
+
+---
+
 ```luau
   }, -- closes bz2
 ```
@@ -620,7 +699,7 @@ compress it with`@std/serde/zstd` before writing it to disk.
 <h4>
 
 ```luau
-function tar.zst.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function tar.zst.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -629,8 +708,11 @@ function tar.zst.extract(path: string, destination: string, options: ArchiveOpti
 
 <summary> See the docs </summary
 
-Extract the tar.zst archive at `path` into a new or existing directory at `destination`. Same erroring
+Extract the tar.zst archive into a new or existing directory at `destination`. Same erroring
 semantics as `fs.writefile`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent extraction bombs.
@@ -698,6 +780,23 @@ function tar.zst.create() -> Archive,
 </h4>
 
 Create a new empty `Archive`.
+
+---
+
+### tar.zst.compression
+
+<h4>
+
+```luau
+function tar.zst.compression(level: number) -> CompressionLevel,
+```
+
+</h4>
+
+Builds a `Zstd CompressionLevel` for use when writing/serializing tar.zst archives.
+
+`level` is zstd's level, -7 (fastest) - 22 (best); default is 3.
+Passing 0 tells zstd to use its default compression level (3).
 
 ---
 

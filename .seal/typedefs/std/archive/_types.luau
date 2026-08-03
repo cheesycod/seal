@@ -14,6 +14,7 @@ export type ArchiveOptions = {
     max_total_size: FileSize?,
     allow_symlinks: boolean?,
     allow_unsafe_path_traversals: boolean?,
+    compression_level: CompressionLevel?,
 }
 
 --[=[

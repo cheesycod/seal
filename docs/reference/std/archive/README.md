@@ -66,7 +66,6 @@ To extract an archive directly to disk, use the respective library's extract fun
 
 ```luau
 const tar = require("@std/archive/tar")
-
 const tar_path = fs.path.join(script:parent(), "credentials.tar.gz")
 tar.gz.extract(tar_path, fs.path.join(script:parent(), "credentials"))
 fs.removefile(tar_path)
@@ -74,7 +73,18 @@ fs.removefile(tar_path)
 
 To read an `Archive` into memory, use the respective library's `load` function or `archive.load`.
 
-Note that `Archives` are completely format-generic, you can unzip a zip file and resave it as a tar.gz without
+To extract a compressed (single) file to disk, use this top level archive library's `archive.extract`.
+
+```luau
+const archive = require("@std/archive")
+const filesize = require("@std/fs/filesize")
+const coredump_path = fs.path.join(coredumps, "recent-coredump.zst")
+archive.extract(coredump_path, "./coredump.core", "Zst", {
+    max_file_size = filesize.megabytes(800) -- coredumps are really big sometimes
+})
+```
+
+Note that `Archives` are completely format-agnostic; you can unzip a zip file and resave it as a tar.gz without
 writing to disk first.
 
 </details>
@@ -146,6 +156,35 @@ that don't have a dedicated archive library as an archive.
 
 If you know what format you're going to use up front, prefer using its dedicated library's own `load`
 (`zip.load`, `tar.gz.load`), which doesn't need `format` passed in.
+
+To increase size limits, allow unsafe path traversals or allow symlinks, see `ArchiveOptions`.
+
+</details>
+
+---
+
+### archive.extract
+
+<h4>
+
+```luau
+function archive.extract(path_or_archive: string | Archive, destination: string, format: ArchiveFormat, options: ArchiveOptions?) -> (),
+```
+
+</h4>
+
+<details>
+
+<summary> See the docs </summary
+
+Extract an archive or single compressed file to `destination`, creating a new directory at
+`destination` if the archive isn't a single compressed file and `destination` doesn't exist.
+
+If `path_or_archive` is a path, takes advantage of streaming mode to read the archive once and then stream
+it directly to `destination` without as many intermediate allocations.
+
+This function also works on single-file formats, so you can use this to extract
+(for example) `.zst` compressed files as well as archives.
 
 To increase size limits, allow unsafe path traversals or allow symlinks, see `ArchiveOptions`.
 

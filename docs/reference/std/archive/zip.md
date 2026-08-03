@@ -8,9 +8,40 @@
 Read, write, and extract the most common archive type I know of,
 the DEFLATE-based zip format.
 
-Uses DEFLATE's default compression level (6).
+## Usage
 
-If you need a different level, open an issue, make a PR, or contact me.
+Example: extract new album to Music folder, fixing song paths.
+
+```luau
+const zip = require("@std/archive/zip")
+const fs = require("@std/fs")
+const str = require("@std/str")
+
+const archive_path = fs.dir.home()
+    :expect_dir("Downloads")
+    :list(false, function(p)
+        -- assume album is only zip in downloads dir
+        return str.endswith(p, ".zip")
+    end)[1]
+
+const artist_dir = fs.dir.home()
+    :expect_dir("Music")
+    :expect_dir("Future Palace")
+
+const output_path = artist_dir:join("Resurgence")
+
+const arc = zip.readfile(archive_path)
+-- fix paths by removing unneeded directory from all paths before extraction
+for _, entry in arc do
+    const file = entry:expect_file()
+    -- path is like "Future Palace - Resurgence/10 Symphony of the Clouds.flac"
+    -- but we want it saved like "Resurgence/10 Symphony of the Clouds.flac" where Resurgence is output_path
+    const path = assert(fs.path.child(file:path()), "can't get child of path")
+    entry:set_path(path)
+end
+arc:extract(output_path)
+fs.removefile(archive_path)
+```
 
 ---
 
@@ -19,7 +50,7 @@ If you need a different level, open an issue, make a PR, or contact me.
 <h4>
 
 ```luau
-function zip.extract(path: string, destination: string, options: ArchiveOptions?) -> (),
+function zip.extract(path_or_archive: string | Archive, destination: string, options: ArchiveOptions?) -> (),
 ```
 
 </h4>
@@ -28,7 +59,10 @@ function zip.extract(path: string, destination: string, options: ArchiveOptions?
 
 <summary> See the docs </summary
 
-Extract the zip file at `path` into a new or existing directory at `destination`.
+Extract the zip file into a new or existing directory at `destination`.
+
+`path_or_archive` can be a path string or an `Archive` instance you've read and modified in memory.
+Prefer passing a path on disk for performance reasons.
 
 This protects against path traversal attacks (unexpectedly writing outside destination directory),
 symlink traversal attacks, and caps archive and individual file sizes to prevent zip bombs.
@@ -102,6 +136,27 @@ function zip.create() -> Archive,
 </h4>
 
 Create a new empty `Archive`.
+
+---
+
+### zip.compression
+
+<h4>
+
+```luau
+function zip.compression(mode: "Store" | "Deflate", level: number?) -> CompressionLevel,
+```
+
+</h4>
+
+Builds a `Deflate CompressionLevel` for use when writing/serializing zip archives.
+
+For no compression, use mode `"Store"`.
+
+For configurable compression levels, use mode `"Deflate"`.
+
+When mode is `"Deflate"`, compression `level` can range from 0 (no compression) to 9 (best).
+Defaults to 6.
 
 ---
 

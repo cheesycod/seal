@@ -1,0 +1,3 @@
+disallowed-methods = [
+    { path = "std::path::Path::join", reason = "Path::join(self, child) silently overwrites self with child (discarding anything in the Path) if child starts with an absolute path sep. #[allow(clippy::disallowed_methods, reason = reason)] once you've verified your callsite is safe." },
+]
