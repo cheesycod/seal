@@ -5,6 +5,8 @@
 
 `local entry = require("@std/archive/entry")`
 
+Constructors of `ArchiveEntry` instances for `@std/archive` functions and `Archive` methods.
+
 ---
 
 ### entry.create
@@ -16,6 +18,8 @@ create: {
 ```
 
 </h4>
+
+Create new entries (file/directory/symlink)
 
 ---
 
@@ -29,6 +33,10 @@ function entry.create.file(path: string, contents: string | buffer) -> ArchiveEn
 
 </h4>
 
+Create a new file `ArchiveEntry` with default unix permissions and no modified time.
+
+Call methods on this to set unix_mode and modified time.
+
 ---
 
 ### entry.create.directory
@@ -41,6 +49,10 @@ function entry.create.directory(path: string) -> ArchiveEntryDirectory,
 
 </h4>
 
+Create a new directory `ArchiveEntry` with default unix permissions and no modified time.
+
+Call methods on this to set unix_mode and modified time.
+
 ---
 
 ### entry.create.symlink
@@ -52,6 +64,10 @@ function entry.create.symlink(path: string, target: string) -> ArchiveEntrySymli
 ```
 
 </h4>
+
+Create a new symlink `ArchiveEntry` with default unix permissions and no modified time.
+
+Call methods on this to set unix_mode and modified time.
 
 ---
 
@@ -70,6 +86,13 @@ function entry.read(path: string, as: string?) -> ArchiveEntry | { ArchiveEntry 
 ```
 
 </h4>
+
+Create an `ArchiveEntry` from existing files/directories on disk. Preserves unix permissions
+and modified time if present. Returns a single ArchiveEntry when `path` points to a file,
+or `{ ArchiveEntry }` if path points to a directory. You can pass the return of this
+directly to `Archive:append`.
+
+Not able to create symlinks right now.
 
 ---
 
