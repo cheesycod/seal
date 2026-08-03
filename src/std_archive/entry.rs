@@ -321,7 +321,7 @@ impl WrappedArchiveEntry {
         }
     }
 
-    fn entry_as_self(luau: &Lua, this: &WrappedArchiveEntry, what: EntryType) -> LuaValueResult {
+    fn entry_try_self(luau: &Lua, this: &WrappedArchiveEntry, what: EntryType) -> LuaValueResult {
         let inner = this.inner.borrow();
         let success = match what {
             EntryType::File => inner.is_file(),
@@ -335,8 +335,8 @@ impl WrappedArchiveEntry {
         }
     }
 
-    fn entry_as_file(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
-        Self::entry_as_self(luau, this, EntryType::File)
+    fn entry_try_file(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
+        Self::entry_try_self(luau, this, EntryType::File)
     }
 
     fn entry_expect_file(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
@@ -344,8 +344,8 @@ impl WrappedArchiveEntry {
         Self::entry_expect_self(luau, this, EntryType::File, function_name)
     }
 
-    fn entry_as_directory(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
-        Self::entry_as_self(luau, this, EntryType::Directory)
+    fn entry_try_directory(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
+        Self::entry_try_self(luau, this, EntryType::Directory)
     }
 
     fn entry_expect_directory(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
@@ -353,8 +353,8 @@ impl WrappedArchiveEntry {
         Self::entry_expect_self(luau, this, EntryType::Directory, function_name)
     }
 
-    fn entry_as_symlink(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
-        Self::entry_as_self(luau, this, EntryType::Symlink)
+    fn entry_try_symlink(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
+        Self::entry_try_self(luau, this, EntryType::Symlink)
     }
 
     fn entry_expect_symlink(luau: &Lua, this: &WrappedArchiveEntry, _: LuaValue) -> LuaValueResult {
@@ -607,11 +607,11 @@ impl LuaUserData for WrappedArchiveEntry {
         );
     }
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("as_file", WrappedArchiveEntry::entry_as_file);
+        methods.add_method("try_file", WrappedArchiveEntry::entry_try_file);
         methods.add_method("expect_file", WrappedArchiveEntry::entry_expect_file);
-        methods.add_method("as_directory", WrappedArchiveEntry::entry_as_directory);
+        methods.add_method("try_directory", WrappedArchiveEntry::entry_try_directory);
         methods.add_method("expect_directory", WrappedArchiveEntry::entry_expect_directory);
-        methods.add_method("as_symlink", WrappedArchiveEntry::entry_as_symlink);
+        methods.add_method("try_symlink", WrappedArchiveEntry::entry_try_symlink);
         methods.add_method("expect_symlink", WrappedArchiveEntry::entry_expect_symlink);
         methods.add_method("size", WrappedArchiveEntry::file_get_size);
         methods.add_method("contents", WrappedArchiveEntry::file_get_contents);

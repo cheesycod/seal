@@ -172,7 +172,7 @@ declare extern type ArchiveEntry with
     --[=[
         Narrow this into an `ArchiveEntryFile` if this entry represents a File.
     ]=]
-    function as_file(self): ArchiveEntryFile?
+    function try_file(self): ArchiveEntryFile?
     --[=[
         Expect/assert that this entry should be an `ArchiveEntryFile`, throwing an error if it isn't.
     ]=]
@@ -181,7 +181,7 @@ declare extern type ArchiveEntry with
     --[=[
         Narrow this into an `ArchiveEntryDirectory` if this entry represents a Directory.
     ]=]
-    function as_directory(self): ArchiveEntryDirectory?
+    function try_directory(self): ArchiveEntryDirectory?
     --[=[
         Expect/assert that this entry should be an `ArchiveEntryDirectory`, throwing an error if it isn't.
     ]=]
@@ -190,7 +190,7 @@ declare extern type ArchiveEntry with
     --[=[
         Narrow this into an `ArchiveEntrySymlink` if this entry represents a Symlink.
     ]=]
-    function as_symlink(self): ArchiveEntrySymlink?
+    function try_symlink(self): ArchiveEntrySymlink?
     --[=[
         Expect/assert that this entry should be an `ArchiveEntrySymlink`, throwing an error if it isn't.
     ]=]
