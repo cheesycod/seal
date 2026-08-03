@@ -121,6 +121,11 @@ jobs:
         run: cargo install cargo-ndk
 
       - name: Build project for Android
+        env:
+          # statically link libc++ so the binary doesn't need libc++_shared.so present at runtime
+          # (the NDK's default is dynamic; -static-libstdc++ is the documented flag for this, even
+          # though the name references libstdc++ for historical reasons - it applies to libc++ too)
+          RUSTFLAGS: "-C link-args=-static-libstdc++"
         run: cargo ndk -t ${{ matrix.abi }} -P 24 build --release
 
       - name: Upload artifacts
