@@ -1,0 +1,10 @@
+
+# seal ships as a single self-contained executable (see docs/install.md), so on Android we
+# statically link libc++ instead of the NDK's default libc++_shared.so - otherwise the binary
+# fails to run on-device with "library libc++_shared.so not found" since there's no companion
+# .so file bundled alongside it.
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-args=-static-libstdc++"]
+
+[target.armv7-linux-androideabi]
+rustflags = ["-C", "link-args=-static-libstdc++"]
