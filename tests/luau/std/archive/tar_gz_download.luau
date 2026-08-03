@@ -61,17 +61,25 @@ else
     const latest_release = data[1]
     assert(latest_release, "can't find latest release")
     
+    const arch_str = if env.arch == "x86_64" then "x64" elseif env.arch == "aarch64" then "arm64" else nil
+    if not arch_str then
+        return -- no released linux build for this arch to compatibility-check against
+    end
+
     local url_to_download: string?
     for _, asset in latest_release.assets do
         if
             str.endswith(asset.name, ".tar.gz")
             and string.find(asset.name, "linux")
+            and string.find(asset.name, arch_str)
         then
             url_to_download = asset.browser_download_url
             break
         end
     end
-    assert(url_to_download, "can't find url to download")
+    if not url_to_download then
+        return -- no released linux-{arch_str} build to compatibility-check against yet
+    end
     
     const response = http.get {
         url = url_to_download,
