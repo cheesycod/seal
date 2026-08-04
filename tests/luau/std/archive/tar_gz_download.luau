@@ -72,6 +72,7 @@ else
             str.endswith(asset.name, ".tar.gz")
             and string.find(asset.name, "linux")
             and string.find(asset.name, arch_str)
+            and not string.find(asset.name, "android")
         then
             url_to_download = asset.browser_download_url
             break
