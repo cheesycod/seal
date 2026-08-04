@@ -97,6 +97,7 @@ if seal_data then
     assert(seal_data.type == "File")
     const exe_bytes = seal_data:expect_file():contents()
     fs.writefile(temp_seal_path, exe_bytes)
+    process.shell(`chmod +x {temp_seal_path}`):unwrap()
     const result = process.run {
         program = temp_seal_path,
         args = { "--help" },
