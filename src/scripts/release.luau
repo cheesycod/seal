@@ -72,14 +72,15 @@ for _, directory in release_artifact_directories do
 
     const contents = fs.listdir(directory, true)
     for _, file in contents do
-        const file_name = fs.path.child(file) or error(`file {file} doesn't have a file name?`)
-        const executable_or_pdb = entry.read(file, fs.path.join(directory_name, file_name))
+        const executable_or_pdb = entry.read(file)
         if 
             typeof(executable_or_pdb) == "ArchiveEntry" 
             and executable_or_pdb:try_file()
             and is_unix
         then
-            executable_or_pdb:expect_file():set_unix_mode(EXECUTABLE_MODE)
+            if executable_or_pdb:path() == "seal" then
+                executable_or_pdb:expect_file():set_unix_mode(EXECUTABLE_MODE)
+            end
         end
         arc:append(executable_or_pdb)
     end
@@ -95,5 +96,12 @@ for _, directory in release_artifact_directories do
     end
 end
 
-const result = process.shell(`gh release create v{version} --draft --generate-notes {output_dir.path}/*`)
-assert(result.ok, `creating a new release failed with error {result.stderr}`)
+const tag = `v{version}`
+const view_result = process.shell(`gh release view {tag}`)
+if view_result.ok then
+    const upload_result = process.shell(`gh release upload {tag} {output_dir.path}/* --clobber`)
+    assert(upload_result.ok, `updating existing release {tag} failed with error {upload_result.stderr}`)
+else
+    const create_result = process.shell(`gh release create {tag} --draft --generate-notes {output_dir.path}/*`)
+    assert(create_result.ok, `creating a new release failed with error {create_result.stderr}`)
+end
