@@ -24,6 +24,8 @@ jobs:
     name: Package and draft release
     needs: ["build"]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed for `gh release create`
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
