@@ -1,3 +1,4 @@
+--!nolint FunctionUnused
 local fs = require("@std/fs")
 
 local parser = require("@libraries/LuauParser/Parser")
