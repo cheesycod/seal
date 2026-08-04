@@ -72,6 +72,7 @@ else
             str.endswith(asset.name, ".tar.gz")
             and string.find(asset.name, "linux")
             and string.find(asset.name, arch_str)
+            and not string.find(asset.name, "android")
         then
             url_to_download = asset.browser_download_url
             break
@@ -97,7 +98,7 @@ if seal_data then
     assert(seal_data.type == "File")
     const exe_bytes = seal_data:expect_file():contents()
     fs.writefile(temp_seal_path, exe_bytes)
-    process.shell(`chmod +x {temp_seal_path}`)
+    process.shell(`chmod +x {temp_seal_path}`):unwrap()
     const result = process.run {
         program = temp_seal_path,
         args = { "--help" },
