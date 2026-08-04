@@ -93,6 +93,7 @@ enum SealCommand {
     ## Examples:
     * `seal eval 'print("hi")'`
     * `seal eval 'print(process.shell({ program = "seal -h" }):unwrap())'`
+    * `echo 'print("hi")' | seal eval -` (reads src from stdin until EOF)
     */
     Eval(Args),
     /**
@@ -269,10 +270,26 @@ fn resolve_file(requested_path: String, function_name: &'static str) -> LuauLoad
 
 fn seal_eval(mut args: Args) -> LuauLoadResult {
     let Some(os_src) = args.pop_front() else {
-        return wrap_err!("seal eval got nothing to eval, did you forget to pass me the src?");
+        return wrap_err!("seal eval got nothing to eval, did you forget to pass me the src? ('seal eval -' to read from stdin)");
     };
-    let Ok(src) = os_src.into_string() else {
-        return wrap_err!("seal eval: luau code must be valid utf-8");
+    let src = if os_src == "-" {
+        let (bytes, _eof) = match std_io::input::read_from_stdin(None, None) {
+            Ok(result) => result,
+            Err(err) => {
+                return wrap_err!("seal eval -: unable to read src from stdin: {}", err);
+            }
+        };
+        match String::from_utf8(bytes) {
+            Ok(src) => src,
+            Err(_) => {
+                return wrap_err!("seal eval -: luau code read from stdin must be valid utf-8");
+            }
+        }
+    } else {
+        let Ok(src) = os_src.into_string() else {
+            return wrap_err!("seal eval: luau code must be valid utf-8");
+        };
+        src
     };
 
     let luau = Lua::default();

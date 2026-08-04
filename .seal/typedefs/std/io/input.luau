@@ -83,39 +83,30 @@ function input.editline(prompt: string, left: string, right: string?): string | 
     return nil :: any
 end
 
-export type InputReadOptions = {
-    --- The maximum number of bytes to read before returning; reading stops once this many bytes
-    --- have been read, even if the stream is still open. Accepts a plain `number` or a `FileSize`.
-    bytes: (number | FileSize)?,
-    --- A `Duration` (from `@std/time`) to wait for input before returning; reading stops once the
-    --- timeout elapses, even if the stream is still open.
-    timeout: Duration?,
-}
-
 --[=[
     Reads from stdin, returning the bytes read and whether there may be more left to read.
 
-    With no `options`, reads all of stdin until EOF and blocks until the stream closes — either a
+    With no arguments, reads all of stdin until EOF and blocks until the stream closes — either a
     pipe closes or the user presses <kbd>Ctrl+D</kbd> in a TTY.
 
     Useful for consuming piped input in scripts, e.g. `echo "hello" | seal script.luau`.
 
     ## Parameters
 
-    - `options.bytes`: the maximum number of bytes to read before returning. Accepts a plain
-      `number` or a `FileSize` (from `@std/fs/filesize`). Reading stops once this many bytes have
-      been read, even if the stream is still open.
-    - `options.timeout`: a `Duration` (from `@std/time`) to wait for input before returning.
-      Reading stops once the timeout elapses, even if the stream is still open.
+    - `bytes`: the maximum number of bytes to read before returning. Accepts a plain `number` or a
+        `FileSize` (from `@std/fs/filesize`). Reading stops once this many bytes have been read, even
+        if the stream is still open.
+    - `timeout`: a `Duration` (from `@std/time`) to wait for input before returning. Reading stops
+        once the timeout elapses, even if the stream is still open.
 
     ## Returns
 
     Returns two values:
 
     - A `string` containing the bytes read from stdin, or `nil` if nothing was read.
-    - A `boolean` that is `true` if reading stopped before EOF (i.e. because the `bytes` limit was
-      reached or the `timeout` elapsed and there may be more to read), and `false` if the stream
-      reached EOF.
+    - A `boolean` `eof` that is `true` if the stream reached EOF, and `false` if reading stopped
+        before EOF (i.e. because the `bytes` limit was reached or the `timeout` elapsed and there may
+        be more to read).
 
     ## Errors
 
@@ -129,16 +120,13 @@ export type InputReadOptions = {
     print(`got {#(contents or "")} bytes from stdin`)
 
     -- read at most 1 KB, or give up after 5 seconds
-    local chunk, more = input.read {
-        bytes = filesize.kilobytes(1),
-        timeout = time.seconds(5),
-    }
-    if more then
+    local chunk, eof = input.read(filesize.kilobytes(1), time.seconds(5))
+    if not eof then
         print("there's still more to read!")
     end
     ```
 ]=]
-function input.read(options: InputReadOptions?): (string?, boolean)
+function input.read(bytes: (number | FileSize)?, timeout: Duration?): (string?, boolean)
     return nil :: any
 end
 

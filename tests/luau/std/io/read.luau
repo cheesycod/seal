@@ -35,11 +35,11 @@ end
 
 local READTOEND = make_child("readtoend", [[
 local input = require("@std/io/input")
-local result, more = input.read()
+local result, eof = input.read()
 if result == nil then
-    print(`NIL more={tostring(more)}`)
+    print(`NIL eof={tostring(eof)}`)
 else
-    print(`{result} more={tostring(more)}`)
+    print(`{result} eof={tostring(eof)}`)
 end
 ]])
 
@@ -53,8 +53,8 @@ local function basic()
     assert(output ~= nil, "input.read: expected output, got nil")
     assert(output:match("hello"), `input.read: expected "hello" in output, got: {output}`)
     assert(output:match("world"), `input.read: expected "world" in output, got: {output}`)
-    -- reading to EOF means there's nothing more to read
-    assert(output:match("more=false"), `input.read: expected more=false after EOF, got: {output}`)
+    -- reading to EOF means eof=true
+    assert(output:match("eof=true"), `input.read: expected eof=true after EOF, got: {output}`)
 end
 
 local function empty_stdin()
@@ -66,7 +66,7 @@ local function empty_stdin()
     assert(stderr == nil or stderr == "", `input.read: empty stdin should not error, got stderr: {tostring(stderr)}`)
     local output = child.stdout:read()
     assert(output ~= nil and output:match("NIL"), `input.read: expected nil return for empty stdin, got: {tostring(output)}`)
-    assert(output ~= nil and output:match("more=false"), `input.read: expected more=false for empty stdin, got: {tostring(output)}`)
+    assert(output ~= nil and output:match("eof=true"), `input.read: expected eof=true for empty stdin, got: {tostring(output)}`)
 end
 
 local function preserves_content()
@@ -82,9 +82,9 @@ local function preserves_content()
         `input.read: all lines should appear in output, got: {tostring(output)}`)
 end
 
--- ── input.read { bytes = ... } ────────────────────────────────────────────────
+-- ── input.read(bytes) ─────────────────────────────────────────────────────────
 
--- reports the number of bytes read, whether there's more, and the exact data.
+-- reports the number of bytes read, whether EOF was reached, and the exact data.
 local READBYTES = make_child("readbytes", [[
 local input = require("@std/io/input")
 local filesize = require("@std/fs/filesize")
@@ -95,8 +95,8 @@ local bytes: number | FileSize = if vars.get("SEAL_TEST_READ_FILESIZE") == "1"
     then filesize.bytes(limit)
     else limit
 
-local data, more = input.read({ bytes = bytes })
-print(`LEN={#(data or "")} MORE={tostring(more)} DATA={data or "<nil>"}`)
+local data, eof = input.read(bytes)
+print(`LEN={#(data or "")} EOF={tostring(eof)} DATA={data or "<nil>"}`)
 ]])
 
 local function reads_up_to_byte_limit()
@@ -108,7 +108,7 @@ local function reads_up_to_byte_limit()
     local output = child.stdout:read()
     assert(output ~= nil, "input.read(bytes): expected output, got nil")
     assert(output:match("LEN=5"), `input.read(bytes): expected exactly 5 bytes read, got: {output}`)
-    assert(output:match("MORE=true"), `input.read(bytes): expected more=true when limit reached, got: {output}`)
+    assert(output:match("EOF=false"), `input.read(bytes): expected eof=false when limit reached, got: {output}`)
     assert(output:match("DATA=hello"), `input.read(bytes): expected "hello", got: {output}`)
 end
 
@@ -121,12 +121,12 @@ local function byte_limit_accepts_filesize()
     local output = child.stdout:read()
     assert(output ~= nil, "input.read(FileSize): expected output, got nil")
     assert(output:match("LEN=3"), `input.read(FileSize): expected exactly 3 bytes read, got: {output}`)
-    assert(output:match("MORE=true"), `input.read(FileSize): expected more=true when limit reached, got: {output}`)
+    assert(output:match("EOF=false"), `input.read(FileSize): expected eof=false when limit reached, got: {output}`)
     assert(output:match("DATA=abc"), `input.read(FileSize): expected "abc", got: {output}`)
 end
 
 local function byte_limit_eof_before_limit()
-    -- limit larger than the input: we should hit EOF first and report more=false
+    -- limit larger than the input: we should hit EOF first and report eof=true
     local child = spawn(READBYTES, { SEAL_TEST_READ_LIMIT = "100" })
     child.stdin:write("hi")
     child.stdin:close()
@@ -135,17 +135,17 @@ local function byte_limit_eof_before_limit()
     local output = child.stdout:read()
     assert(output ~= nil, "input.read(bytes eof): expected output, got nil")
     assert(output:match("LEN=2"), `input.read(bytes eof): expected 2 bytes read, got: {output}`)
-    assert(output:match("MORE=false"), `input.read(bytes eof): expected more=false when EOF reached before limit, got: {output}`)
+    assert(output:match("EOF=true"), `input.read(bytes eof): expected eof=true when EOF reached before limit, got: {output}`)
 end
 
--- ── input.read { timeout = ... } ──────────────────────────────────────────────
+-- ── input.read(nil, timeout) ──────────────────────────────────────────────────
 
 -- reads with a short timeout while stdin stays open; reports what came through.
 local READTIMEOUT = make_child("readtimeout", [[
 local input = require("@std/io/input")
 local time = require("@std/time")
-local data, more = input.read({ timeout = time.milliseconds(200) })
-print(`LEN={#(data or "")} MORE={tostring(more)} DATA={data or "<nil>"}`)
+local data, eof = input.read(nil, time.milliseconds(200))
+print(`LEN={#(data or "")} EOF={tostring(eof)} DATA={data or "<nil>"}`)
 ]])
 
 local function timeout_returns_when_no_input()
@@ -156,7 +156,7 @@ local function timeout_returns_when_no_input()
     local output = child.stdout:read()
     assert(output ~= nil, "input.read(timeout): expected output, got nil")
     assert(output:match("LEN=0"), `input.read(timeout): expected 0 bytes on timeout, got: {output}`)
-    assert(output:match("MORE=true"), `input.read(timeout): expected more=true on timeout, got: {output}`)
+    assert(output:match("EOF=false"), `input.read(timeout): expected eof=false on timeout, got: {output}`)
     pcall(function()
         child.stdin:close()
         return nil
@@ -172,7 +172,7 @@ local function timeout_returns_partial_data()
     local output = child.stdout:read()
     assert(output ~= nil, "input.read(timeout partial): expected output, got nil")
     assert(output:match("DATA=partial"), `input.read(timeout partial): expected "partial", got: {output}`)
-    assert(output:match("MORE=true"), `input.read(timeout partial): expected more=true, got: {output}`)
+    assert(output:match("EOF=false"), `input.read(timeout partial): expected eof=false, got: {output}`)
     pcall(function()
         child.stdin:close()
         return nil
@@ -180,7 +180,7 @@ local function timeout_returns_partial_data()
 end
 
 local function timeout_reads_to_eof()
-    -- if the stream closes before the timeout, we should report more=false
+    -- if the stream closes before the timeout, we should report eof=true
     local child = spawn(READTIMEOUT)
     child.stdin:write("done")
     child.stdin:close()
@@ -189,7 +189,7 @@ local function timeout_reads_to_eof()
     local output = child.stdout:read()
     assert(output ~= nil, "input.read(timeout eof): expected output, got nil")
     assert(output:match("DATA=done"), `input.read(timeout eof): expected "done", got: {output}`)
-    assert(output:match("MORE=false"), `input.read(timeout eof): expected more=false when stream closes, got: {output}`)
+    assert(output:match("EOF=true"), `input.read(timeout eof): expected eof=true when stream closes, got: {output}`)
 end
 
 cheese.retry(basic, 2)

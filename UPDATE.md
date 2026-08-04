@@ -11,6 +11,10 @@ This document will contain new features, breaking changes, etc.
 - [_VERSION global changed formats](#breaking-change-to-_version), now recommend using `_RUNTIME` and `_LUAU` instead
 - Raw terminal events functionality [moved from @std/io/input to @std/terminal](#breaking-changes-apis-moved)
 
+### `seal eval -` now reads from stdin
+
+You can do `echo 'hi' | seal eval -` or like agents typically do with python `seal eval - <<'EOF' <multiple lines of code> EOF`
+
 ### More release targets + support 32-bit platforms
 
 Primarily so the other common Android target (androideabi) compiles, but also why not?
@@ -203,7 +207,7 @@ Rewritten completely to take advantage of the new `@std/terminal` libraries; the
 
 - `io.output.writeln(content: string | buffer) -> error?` - write to stdout with a trailing newline
 - `io.output.ewriteln(content: string | buffer) -> error?` - write to stderr with a trailing newline
-- `io.input.read() -> string?` - reads from stdin until reaching EOF, similar to Lune's `stdio.readToEnd`. Returns `nil` if stdin was empty.
+- `io.input.read(bytes: (FileSize | number)?, timeout: Duration?) -> (string?, eof: boolean)` - reads from stdin until reaching EOF, similar to Lune's `stdio.readToEnd`. Returns `nil` if stdin was empty.
 
 #### Fixes
 
