@@ -3,7 +3,6 @@ local parser = require("@libraries/LuauParser/Parser")
 local fs = require("@std/fs")
 local format = require("@std/io/format")
 local str = require("@std/str")
-local time = require("@std/time")
 
 const syntax = require("@libraries/LuauParser/Parser/Syntax")
 
