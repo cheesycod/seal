@@ -67,7 +67,7 @@ for _, directory in release_artifact_directories do
     if is_android and contains(directory_name, "arm64") then
         directory_name ..= "-aarch64-linux-android"
     elseif is_android and contains(directory_name, "armv7") then
-        directory_name = str.trimback(directory_name, "armv7") .. "-armv7-linux-androideabi"
+        directory_name = str.trimback(directory_name, "armv7") .. "armv7-linux-androideabi"
     end
 
     const contents = fs.listdir(directory, true)
