@@ -310,7 +310,7 @@ pub const STD_IO_INPUT_EDITLINE: &std::ffi::CStr = c"io.input.editline(prompt: s
 pub const STD_IO_INPUT_GET: &std::ffi::CStr = c"io.input.get(raw_prompt: string) -> string";
 pub const STD_IO_INPUT_INTERRUPT: &std::ffi::CStr = c"io.input.interrupt(key: \"CtrlC\" | \"CtrlD\") -> interrupt";
 pub const STD_IO_INPUT_RAWLINE: &std::ffi::CStr = c"io.input.rawline(prompt: string?) -> string";
-pub const STD_IO_INPUT_READ: &std::ffi::CStr = c"io.input.read(options: InputReadOptions?) -> (string?, boolean)";
+pub const STD_IO_INPUT_READ: &std::ffi::CStr = c"io.input.read(bytes: number | FileSize?, timeout: Duration?) -> (string?, boolean)";
 pub const STD_IO_INPUT_READLINE: &std::ffi::CStr = c"io.input.readline(prompt: string) -> string | interrupt | error";
 
 // io.output

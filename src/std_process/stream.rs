@@ -605,6 +605,10 @@ impl Stream {
             None
         };
 
+        if target_offset + count > buffy.len() {
+            return wrap_err!("{}: can't fit offset {} + count {} bytes into buffer of length {}", function_name, target_offset, count, buffy.len());
+        }
+
         loop {
             let mut inner = match self.inner.lock() {
                 Ok(guard) => guard,
@@ -612,7 +616,7 @@ impl Stream {
                     unreachable!("{}: callers of this function shouldn't panic and cause this mutex to become poisoned; if they do, that's a bug we should propagate: {}", function_name, err);
                 }
             };
-            
+
             if inner.is_empty() || inner.len() - 1 < count {
                 if !&self.still_reading.load(Ordering::Relaxed) {
                     return Ok(LuaValue::Boolean(false));
@@ -629,12 +633,10 @@ impl Stream {
                     // allow some time for reader thread to add stuff to inner before continuing to next iteration
                     std::thread::sleep(Duration::from_millis(10));
                 }
-            } else if target_offset + count <= buffy.len() {
+            } else {
                 let bytes_read: Vec<u8> = inner.drain(..count).collect();
                 buffy.write_bytes(target_offset, &bytes_read);
                 return Ok(LuaValue::Boolean(true));
-            } else {
-                return wrap_err!("{}: can't fit offset {} + count {} bytes into buffer of length {}", function_name, target_offset, count, buffy.len());
             }
         }
 
