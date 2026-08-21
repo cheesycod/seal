@@ -36,36 +36,34 @@ export type LuaurcAliases = {
     }
 }
 
-local function maptostring<K, V>(t: { [K]: V }, f: (key: K, val: V) -> string?): string
+const function maptostring<K, V>(t: { [K]: V }, f: (key: K, val: V) -> string?): string
     local result = ""
-    for k, v in t :: any do -- LUAU FIXME: solver fails to complete
-        local s = f(k, v) -- TypeError: Function only returns 0 values, but 1 is required here
+    for k, v in t do
+        local s = f(k, v)
         if s then
-            result ..= "\n" .. s -- TypeError: Type function instance refine<*blocked-14022*, ~(false?)> is uninhabited
+            result ..= "\n" .. s
         end
     end
     return result
 end
 
-local function get_aliases_by_luaurc(requiring_file_path: string): ({LuaurcAliases}?, string?)
-    local aliases_by_luaurc: { LuaurcAliases } = {}
+local function get_aliases_by_config_file(requiring_file_path: string): ({LuaurcAliases}?, string?)
+    local aliases_by_config_file: { LuaurcAliases } = {}
 
     local current_path = fs.path.parent(
         requiring_file_path, 
-        -- init.luaus should not be able to resolve aliases in sibling .luaurcs
+        -- init.luaus should not be able to resolve aliases in sibling config files
         if str.endswith(requiring_file_path, "init.luau") then 2 else 1
     )
     while current_path ~= nil do
-        local possible_luaurc_path = fs.path.join(current_path :: string, ".luaurc")
+        local possible_luaurc_path = fs.path.join(current_path, ".luaurc")
         local contents, result = fs.file.try_read(possible_luaurc_path)
         if contents == nil then
             if result == "PermissionDenied" then
                 return nil, `unable to read .luaurc at '{possible_luaurc_path}' because permission denied`
             end
         else
-            local success, config = pcall(function(): LuaurcConfig
-                return json.decode(contents)
-            end)
+            const success, config = pcall(json.decode, contents)
             if not success then
                 local err = config :: error
                 return nil, `unable to decode .luaurc at '{possible_luaurc_path} due to err: {tostring(err)}'`
@@ -97,7 +95,7 @@ local function get_aliases_by_luaurc(requiring_file_path: string): ({LuaurcAlias
             end
             -- we want to 'push_front' our array so the closest aliases to the requiring_file
             -- get assigned last (so overwriting those in farther luaurcs)
-            table.insert(aliases_by_luaurc, 1, current_luaurc)
+            table.insert(aliases_by_config_file, 1, current_luaurc)
         end
         current_path = fs.path.parent(current_path :: string)
     end
@@ -105,7 +103,7 @@ local function get_aliases_by_luaurc(requiring_file_path: string): ({LuaurcAlias
     if str.endswith(requiring_file_path, "init.luau") then
         -- @self should refer to the direct parent dir of an init.luau
         -- regardless of whichever meaning of ./relative we use in seal 
-        table.insert(aliases_by_luaurc, 1, {
+        table.insert(aliases_by_config_file, 1, {
             path = "self alias for init.luau (https://github.com/luau-lang/rfcs/pull/109)",
             aliases = {
                 self = fs.path.parent(requiring_file_path) :: string
@@ -113,7 +111,7 @@ local function get_aliases_by_luaurc(requiring_file_path: string): ({LuaurcAlias
         } :: LuaurcAliases)
     end
     
-    return aliases_by_luaurc, nil
+    return aliases_by_config_file, nil
 end
 
 -- returns the expanded current_path with a replacement found from a .luaurc if one exists
@@ -208,9 +206,9 @@ local function resolve(
     ]]
 ): RequireResolveResult
     local debug_name: string = override_debug_name or debug.info(3, "s") --[[ 
-    this should give us the 
-    debug name (set by luau.load().set_name) for the chunk that called require(),
-    in the format `[string "./src/somewhere.luau"]`
+        this should give us the 
+        debug name (set by luau.load().set_name) for the chunk that called require(),
+        in the format `[string "./src/somewhere.luau"]`
     ]]
     local requiring_file_path = 
         if str.startswith(debug_name, "[") then 
@@ -218,15 +216,16 @@ local function resolve(
         else
             debug_name
 
-    local try_new_init_luau_semantics = -- luau lsp has updated, so let's use new semantics by default
-        if try_new_init_luau_semantics == nil or try_new_init_luau_semantics == true then true else false
-    local use_new_init_luau_semantics = -- we only want to use new init.luau semantics if
+    -- luau lsp has updated, so let's use new semantics by default
+    local try_new_init_luau_semantics = 
+        try_new_init_luau_semantics == nil or try_new_init_luau_semantics == true
+    local use_new_init_luau_semantics =
         try_new_init_luau_semantics and str.endswith(requiring_file_path, "init.luau")
 
     local current_path = requiring_file_path
     local trim_after_index = 0
     if string.sub(requested_path, 1, 1) == "@" then
-        local aliases_by_luaurc, err = get_aliases_by_luaurc(requiring_file_path)
+        local aliases_by_luaurc, err = get_aliases_by_config_file(requiring_file_path)
         if err or aliases_by_luaurc == nil then
             return {
                 err = err :: string
@@ -257,9 +256,6 @@ local function resolve(
             err = `one or more parents could not be extracted from '{requested_path}'; is the requested path formatted correctly?`
         }
     end
-
-    local fs = fs -- LUAU FIXME: you won't believe this,
-    -- but this noop fixes fs.path.* functions suddenly disappearing and becoming never in the below code
 
     -- trim ./ and ../ from requested_path
     if trim_after_index > 0 then
@@ -317,38 +313,6 @@ local function resolve(
         }
     end
 
-    -- local trying_to_require_directory = false
-    -- local find_result: fs.FindResult = fs.find(current_path, { error_if_permission_denied = false })
-    -- if find_result.type == "Directory" then
-    -- 	local possible_init_path = fs.path.join(current_path, "init.luau")
-    -- 	local possible_concat_path = current_path .. ".luau"
-        
-    -- 	local init_path_exists = fs.path.exists(possible_init_path)
-    -- 	local concat_path_exists = fs.path.exists(possible_concat_path)
-
-    -- 	if init_path_exists and concat_path_exists then
-    -- 		-- both foo.luau and foo/init.luau exist (which one do we want??)
-    -- 		return {
-    -- 			err = `'{requested_path}' is ambiguous!! and can't be resolved.\nBoth '{possible_init_path}' and '{possible_concat_path}' exist; \z
-    -- 			rename either the directory '{fs.path.child(current_path)}/' or file '{fs.path.child(possible_concat_path)}' so we can figure out which one you meant`
-    -- 		}
-    -- 	elseif init_path_exists then
-    -- 		-- foo/init.luau exists
-    -- 		current_path = possible_init_path
-    -- 	elseif concat_path_exists then
-    -- 		-- foo/ exists and foo/init.luau doesn't exist BUT foo.luau exists (we should resolve to foo.luau)
-    -- 		current_path ..= ".luau"
-    -- 	else
-    -- 		trying_to_require_directory = true
-    -- 	end
-    -- elseif find_result.type == "NotFound" then
-    -- 	current_path ..= ".luau"
-    -- elseif find_result.type == "PermissionDenied" then
-    -- 	return {
-        
-    -- 	}
-    -- end
-
     assert(current_path ~= nil, "current_path should not be nil at this point 2")
 
     if fs.path.exists(current_path) then
@@ -380,6 +344,6 @@ end
 
 return {
     resolve = resolve,
-    get_aliases = get_aliases_by_luaurc,
+    get_aliases = get_aliases_by_config_file,
     expand_aliases = expand_aliases,
 }
