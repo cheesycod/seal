@@ -1,11 +1,16 @@
 use mluau::prelude::*;
 use crate::prelude::*;
+use crate::userdata::SealUserData;
+use crate::userdata::SealUserDataExt;
+use crate::userdata::SealUserDataFields;
+use crate::userdata::SealUserDataMethods;
 
+use std::borrow::Cow;
 use std::path::PathBuf;
 use mluau::Compiler;
 
-struct EvalError {
-    message: String,
+pub(crate) struct EvalError {
+    pub(crate) message: String,
 }
 impl EvalError {
     fn new(err: LuaError) -> Self {
@@ -14,12 +19,15 @@ impl EvalError {
         }
     }
 }
-impl LuaUserData for EvalError {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+impl SealUserData for EvalError {
+    fn type_name<'a>() -> Cow<'a, str> {
+        Cow::Borrowed("EvalError")
+    }
+    fn add_fields<F: SealUserDataFields<Self>>(fields: &mut F) {
         fields.add_meta_field("__type", "error"); // allow users to typeof check
     }
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::ToString, | luau: &Lua, this: &EvalError, _: LuaValue| -> LuaValueResult {
+    fn add_methods<M: SealUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_method(LuaMetaMethod::ToString, | luau, this, _: ()| -> LuaValueResult {
             this.message.clone().into_lua(luau)
         });
     }
@@ -179,7 +187,7 @@ unsafe fn eval(luau: &Lua, src: Vec<u8>, eval_options: EvalOptions) -> LuaValueR
     let res = match chunk.eval::<LuaValue>() {
         Ok(value) => value,
         Err(err) => {
-            LuaValue::UserData(luau.create_userdata(EvalError::new(err))?)
+            LuaValue::UserData(luau.create_seal_userdata(EvalError::new(err))?)
         }
     };
 
@@ -253,7 +261,7 @@ fn luau_bytecode(luau: &Lua, value: LuaValue) -> LuaValueResult {
         Ok(bytecode) => bytecode,
         Err(err) => {
             return Ok(LuaValue::UserData(
-                luau.create_userdata(EvalError::new(err))?
+                luau.create_seal_userdata(EvalError::new(err))?
             ))
         }
     };
@@ -274,7 +282,7 @@ fn luau_bundle(luau: &Lua, value: LuaValue) -> LuaValueResult {
     };
     match crate::compile::bundle(&PathBuf::from(path)) {
         Ok(bundled) => bundled.into_lua(luau),
-        Err(err) => Ok(LuaValue::UserData(luau.create_userdata(EvalError::new(err))?)),
+        Err(err) => Ok(LuaValue::UserData(luau.create_seal_userdata(EvalError::new(err))?)),
     }
 }
 

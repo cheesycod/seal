@@ -49,7 +49,7 @@ pub fn parse_traceback(raw_traceback: String) -> String {
                 Ok(LuaValue::UserData(ud)) => {
                     match WrappedError::borrowed(ud) {
                         Ok(err) => {
-                            panic!("parse_traceback.luau (error formatter) errored at runtime:\n\n{}", err.message());
+                            panic!("parse_traceback.luau (error formatter) errored at runtime:\n\n{}", err.borrow().message());
                         },
                         Err(name) => {
                             panic!("parse_traceback.luau should return string or return an error, got userdata of type: {}", name);
@@ -204,6 +204,7 @@ pub fn display_error_and_exit(err: LuaError) -> ! {
     std::process::exit(1);
 }
 
+// TODO: Switch this to returning a WrappedError directly
 #[macro_export]
 macro_rules! wrap_err {
     ($msg:expr) => {{

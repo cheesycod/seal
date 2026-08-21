@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::std_err::WrappedError;
 use mluau::prelude::*;
 
 use crate::globals;
@@ -119,7 +120,7 @@ pub fn bundle(project_path: &Path) -> LuaResult<String> {
         }
     };
 
-    let res = match bundle.call::<LuaValue>(project_path.into_lua(&luau)?) {
+    let res = match bundle.call_with_err::<LuaValue, WrappedError>(project_path.into_lua(&luau)?) {
         Ok(LuaValue::String(bundled)) => bundled.to_string_lossy(),
         Ok(LuaValue::UserData(ud)) => {
             return wrap_err!("seal bundle - {}", ud.to_string()?)

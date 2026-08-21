@@ -4,7 +4,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use std::io::Cursor;
 use unicode_reader::Graphemes;
 
-use mluau::prelude::*;
+use mluau::{FunctionMutExt, prelude::*};
 use crate::prelude::*;
 
 /// bytes-per-split divisor grows with sqrt(len) past `SPLIT_SCALE_THRESHOLD`, so the guess grows sublinearly

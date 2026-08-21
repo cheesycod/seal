@@ -29,7 +29,7 @@ fn standalone_extract(luau: &Lua, value: LuaValue) -> LuaValueResult {
         }
     };
     if let Some(bytecode) = compile::extract_bytecode(Some(path)) {
-        ok_buffy(&bytecode, luau)
+        ok_buffy(bytecode, luau)
     } else {
         wrap_err!("{}: bytecode could not be extracted :/ check your path?", function_name)
     }

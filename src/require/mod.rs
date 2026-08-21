@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{std_err::WrappedError, *};
 use crate::std_fs::pathlib::normalize_path;
 use std::{fs, io};
 
@@ -183,7 +183,7 @@ pub fn get_resolver(luau: &Lua) -> LuaResult<LuaTable> {
 }
 
 fn cached_resolver(luau: &Lua) -> LuaResult<LuaFunction> {
-    let f = luau.named_registry_value::<Option<LuaFunction>>("require.resolver.resolve")?;
+    let f = luau.registry().get::<Option<LuaFunction>>("require.resolver.resolve")?;
     if let Some(resolve) = f {
         Ok(resolve)
     } else {
@@ -195,7 +195,7 @@ fn cached_resolver(luau: &Lua) -> LuaResult<LuaFunction> {
             panic!("require resolver.resolve not a function??");
         };
 
-        luau.set_named_registry_value("require.resolver.resolve", &resolve)?;
+        luau.registry().set("require.resolver.resolve", &resolve)?;
 
         Ok(resolve)
     }
@@ -203,7 +203,7 @@ fn cached_resolver(luau: &Lua) -> LuaResult<LuaFunction> {
 
 fn resolve_path(luau: &Lua, path: String) -> LuaResult<String> {
     let resolve = cached_resolver(luau)?;
-    match resolve.call::<LuaValue>(path.to_owned()) {
+    match resolve.call_with_err::<LuaValue, WrappedError>(path.to_owned()) {
         Ok(LuaValue::Table(result_table)) => {
             if let LuaValue::String(path) = result_table.raw_get("path")? {
                 Ok(path.to_string_lossy())

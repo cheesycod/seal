@@ -7,11 +7,11 @@ edition = "2024"
 # mluau is our custom mlua fork with a greater focus on luau and luau ecosystem
 # support, maintained by Midnight Frost and myself (mostly him).
 [target.'cfg(not(target_os = "android"))'.dependencies]
-mluau = { git = "https://github.com/mluau/mluau.git", features = ["luau", "luau-jit", "serialize", "error-send", "luau-classes"] }
+mluau = { git = "https://github.com/mluau/mluau.git", features = ["luau", "luau-jit", "serialize", "luau-classes"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 # luau jit (ncg) compilation is not available on android
-mluau = { git = "https://github.com/mluau/mluau.git", features = ["luau", "serialize", "error-send", "luau-classes"] }
+mluau = { git = "https://github.com/mluau/mluau.git", features = ["luau", "serialize", "luau-classes"] }
 
 [dependencies]
 regex = "1.11.1"
@@ -97,7 +97,7 @@ bstr = "1.12.3"
 # my custom fork of archive crate with huge featureset and safety improvements
 # including writing archives and dealing with unsafe path traversals, also fixes
 # a number of bugs in how it handled protecting against archive bombs in some formats
-archive = { git = "https://github.com/deviaze/archive.git", branch = "safer" }
+archive = { git = "https://github.com/deviaze/archive.git", branch = "safer", version = "0.4.0" }
 # compile time macro makes archive much more DRY
 pastey = "0.2.3"
 

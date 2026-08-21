@@ -26,6 +26,7 @@
 // runtime case, so we ban the method outright via clippy.toml's disallowed-methods.
 #![warn(clippy::disallowed_methods, reason = "see clippy.toml for banned methods and why")]
 
+use crate::std_err::WrappedError;
 use crate::{prelude::*, setup::SetupOptions};
 use mluau::prelude::*;
 
@@ -63,6 +64,7 @@ mod setup;
 mod compile;
 mod std_args;
 mod std_archive;
+mod userdata;
 
 use err::display_error_and_exit;
 use sealconfig::SealConfig;
@@ -148,7 +150,7 @@ impl SealCommand {
     // rest of the SealCommand impl defined at the bottom of main.rs
 }
 
-fn set_fflags(flags: [&'static str; 3]) -> LuaResult<()> {
+fn set_fflags<const N: usize>(flags: [&'static str; N]) -> LuaResult<()> {
     for flag in flags {
         if mluau::Lua::set_fflag(flag, true).is_err() {
             eputs!("[WARN] unable to enable Luau FFlag '{}'; was Luau updated and the flag removed?", flag)?;
@@ -172,8 +174,6 @@ fn main() -> LuaResult<()> {
     crate::std_io::input::EXPECT_OUTPUT_STREAMS.initialize_and_check();
 
     set_fflags([
-        "DebugLuauUserDefinedClassesRuntime",
-        "DebugLuauUserDefinedClasses",
         "LuauExportValueSyntax"
     ])?;
 
@@ -213,9 +213,14 @@ fn main() -> LuaResult<()> {
         Err(err) => display_error_and_exit(err),
     };
 
-    match luau.load(code).set_name(chunk_name).exec() {
-        Ok(_) => Ok(()),
+    let func = match luau.load(code).set_name(chunk_name).into_function() {
+        Ok(func) => func,
         Err(err) => display_error_and_exit(err),
+    };
+
+    match func.call_with_err::<(), WrappedError>(()) {
+        Ok(_) => Ok(()),
+        Err(err) => display_error_and_exit(LuaError::external(err.to_string())),
     }
 }
 

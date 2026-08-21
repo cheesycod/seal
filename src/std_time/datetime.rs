@@ -1,6 +1,6 @@
-use std::{ops::Deref, time::SystemTime};
+use std::{borrow::Cow, ops::Deref, time::SystemTime};
 
-use crate::{prelude::*, std_time::duration::TimeDuration};
+use crate::{prelude::*, std_time::duration::TimeDuration, userdata::{SealLock, SealUserData, SealUserDataFields, SealUserDataMethods}};
 use mluau::prelude::*;
 use jiff::Zoned;
 
@@ -88,7 +88,7 @@ impl DateTime {
         }
     }
     pub fn get_userdata(self, luau: &Lua) -> LuaValueResult {
-        ok_userdata(self, luau)
+        ok_userdata_mut(self, luau)
     }
     pub fn _to_system_time(&self) -> SystemTime {
         SystemTime::from(self.inner.timestamp())
@@ -98,47 +98,50 @@ impl DateTime {
     }
 }
 
-impl LuaUserData for DateTime {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("year", |_: &Lua, this: &DateTime| Ok(this.inner.date().year()));
-        fields.add_field_method_get("month", |_: &Lua, this: &DateTime| Ok(this.inner.date().month()));
-        fields.add_field_method_get("day", |_: &Lua, this: &DateTime| Ok(this.inner.date().day()));
-        fields.add_field_method_get("hour", |_: &Lua, this: &DateTime| Ok(this.inner.time().hour()));
-        fields.add_field_method_get("minute", |_: &Lua, this: &DateTime| Ok(this.inner.time().minute()));
-        fields.add_field_method_get("second", |_: &Lua, this: &DateTime| Ok(this.inner.time().second()));
-        fields.add_field_method_get("millisecond", |_: &Lua, this: &DateTime| Ok(this.inner.time().millisecond()));
-        fields.add_field_method_get("weekday", |_: &Lua, this: &DateTime| {
+impl SealUserData for DateTime {
+    fn type_name<'a>() -> Cow<'a, str> {
+        Cow::Borrowed("DateTime")
+    }
+    fn add_fields<F: SealUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("year", |_: &Lua, this| Ok(this.inner.date().year()));
+        fields.add_field_method_get("month", |_: &Lua, this| Ok(this.inner.date().month()));
+        fields.add_field_method_get("day", |_: &Lua, this| Ok(this.inner.date().day()));
+        fields.add_field_method_get("hour", |_: &Lua, this| Ok(this.inner.time().hour()));
+        fields.add_field_method_get("minute", |_: &Lua, this| Ok(this.inner.time().minute()));
+        fields.add_field_method_get("second", |_: &Lua, this| Ok(this.inner.time().second()));
+        fields.add_field_method_get("millisecond", |_: &Lua, this| Ok(this.inner.time().millisecond()));
+        fields.add_field_method_get("weekday", |_: &Lua, this| {
             Ok(this.inner.strftime("%A").to_string()) // like 'Monday'
         });
-        fields.add_field_method_get("unix_timestamp", |_: &Lua, this: &DateTime| {
+        fields.add_field_method_get("unix_timestamp", |_: &Lua, this| {
             Ok(this.inner.timestamp().as_second())
         });
-        fields.add_field_method_get("timezone", |luau: &Lua, this: &DateTime| {
+        fields.add_field_method_get("timezone", |luau: &Lua, this| {
             let timezone = match this.inner.time_zone().iana_name() {
                 Some(tz) => tz.to_string(),
                 None => String::default(),
             };
             ok_string(timezone, luau)
         });
-        fields.add_field_method_get("iso", |_: &Lua, this: &DateTime| {
+        fields.add_field_method_get("iso", |_: &Lua, this| {
             Ok(this.inner.to_string())
         });
     }
 
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::ToString, | luau: &Lua, this: &DateTime, _: LuaValue| -> LuaValueResult {
+    fn add_methods<M: SealUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_method(LuaMetaMethod::ToString, | luau: &Lua, this, _: LuaValue| -> LuaValueResult {
             ok_string(format!("DateTime<{}>", this.inner.strftime("%Y-%m-%d %H:%M:%S (%I:%M %p) [%Z]")), luau)
         });
-        methods.add_method("display", | luau: &Lua, this: &DateTime, _value: ()| {
+        methods.add_method("display", | luau: &Lua, this, _value: ()| {
             // :display() shows format like 2025-08-18 18:20:44 (6:20 PM) [CDT]
             ok_string(format!("{}", this.inner.strftime("%Y-%m-%d %H:%M:%S (%I:%M %p) [%Z]")), luau)
         });
-        methods.add_method("__dp", | luau: &Lua, this: &DateTime, _value: ()| {
+        methods.add_method("__dp", | luau: &Lua, this, _value: ()| {
             // shows the entire roundtrippable DateTime<2025-08-18T20:23:29.85205845-05:00[America/Chicago]>
             ok_string(format!("DateTime<{:?}>", this.inner), luau)
         });
 
-        methods.add_method("format", |luau: &Lua, this: &DateTime, value: LuaValue| -> LuaValueResult {
+        methods.add_method("format", |luau: &Lua, this, value: LuaValue| -> LuaValueResult {
             let function_name = "DateTime:format(format: string)";
             let format_string = match value {
                 LuaValue::String(s) => s.to_string_lossy(),
@@ -149,7 +152,7 @@ impl LuaUserData for DateTime {
             ok_string(this.format(&format_string, function_name)?, luau)
         });
 
-        methods.add_method("in_timezone", |luau: &Lua, this: &DateTime, value: LuaValue| -> LuaValueResult {
+        methods.add_method("in_timezone", |luau: &Lua, this, value: LuaValue| -> LuaValueResult {
             let function_name = "DateTime:in_timezone(timezone: IanaTimezone)";
             let timezone = match value {
                 LuaValue::String(s) => s.to_string_lossy(),
@@ -171,13 +174,12 @@ impl LuaUserData for DateTime {
 
 
         // literally the same as "timespan"
-        methods.add_method("to", |luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_method("to", |luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime:to(other: DateTime)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<DateTime>() {
-                        let other_dt = ud.borrow::<DateTime>().expect("no way not DateTime");
-                        let span = match this.inner.until(&other_dt.deref().inner) {
+                    if let Some(other_dt) = ud.borrow::<SealLock<DateTime>>() {
+                        let span = match this.inner.until(&other_dt.deref().borrow().inner) {
                             Ok(span) => span,
                             Err(err) => {
                                 return wrap_err!("{} unable to compute timespan due to err: {}", function_name, err);
@@ -194,13 +196,12 @@ impl LuaUserData for DateTime {
             }
         });
 
-        methods.add_method("timespan", |luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_method("timespan", |luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime:timespan(other: DateTime)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<DateTime>() {
-                        let other_dt = ud.borrow::<DateTime>().expect("no way not DateTime");
-                        let span = match this.inner.until(&other_dt.deref().inner) {
+                    if let Some(other_dt) = ud.borrow::<SealLock<DateTime>>() {
+                        let span = match this.inner.until(&other_dt.deref().borrow().inner) {
                             Ok(span) => span,
                             Err(err) => {
                                 return wrap_err!("{} unable to compute timespan due to err: {}", function_name, err);
@@ -217,13 +218,12 @@ impl LuaUserData for DateTime {
             }
         });
 
-        methods.add_method("since", |luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_method("since", |luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime:since(other: DateTime)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<DateTime>() {
-                        let other_dt = ud.borrow::<DateTime>().expect("no way not DateTime");
-                        let span = match this.inner.since(&other_dt.deref().inner) {
+                    if let Some(other_dt) = ud.borrow::<SealLock<DateTime>>() {
+                        let span = match this.inner.since(&other_dt.deref().borrow().inner) {
                             Ok(span) => span,
                             Err(err) => {
                                 return wrap_err!("{} unable to compute timespan due to err: {}", function_name, err);
@@ -241,18 +241,17 @@ impl LuaUserData for DateTime {
         });
 
         // DateTime + TimeSpan -> DateTime
-        methods.add_meta_method(LuaMetaMethod::Add, |luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_meta_method(LuaMetaMethod::Add, |luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime.__add(self, other: TimeSpan)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<TimeSpan>() {
-                        let other_timespan = ud.borrow::<TimeSpan>().expect("impossible not TimeSpan");
-                        let new_dt = &this.inner + other_timespan.deref().inner;
+                    if let Some(other_timespan) = ud.borrow::<SealLock<TimeSpan>>() {
+                        let new_dt = &this.inner + other_timespan.deref().borrow().inner;
                         DateTime::from(new_dt).get_userdata(luau)
-                    } else if ud.is::<DateTime>() {
-                        // let other_dt = ud.borrow::<DateTime>().expect("impossible not DateTime");
+                    } else if let Some(_) = ud.borrow::<SealLock<DateTime>>() {
+                        // let other_dt = ud.borrow::<SealLock<DateTime>>().expect("impossible not DateTime");
                         wrap_err!("{}: adding DateTime + DateTime makes no sense and is ambiguous, did you mean to add a TimeSpan?", function_name)
-                    } else if ud.is::<TimeDuration>() {
+                    } else if let Some(_) = ud.borrow::<SealLock<TimeDuration>>() {
                         wrap_err!("{}: unfortunately we can't add DateTime + Duration directly, you need to use a TimeSpan (time.datetime.days(n))")
                     } else {
                         wrap_err!("{}: other must be a TimeSpan", function_name)
@@ -265,18 +264,17 @@ impl LuaUserData for DateTime {
         });
 
         // DateTime - TimeSpan -> DateTime;
-        methods.add_meta_method(LuaMetaMethod::Sub, |luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_meta_method(LuaMetaMethod::Sub, |luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime.__sub(self, other: TimeSpan)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<TimeSpan>() {
-                        let other_timespan = ud.borrow::<TimeSpan>().expect("impossible not TimeSpan");
-                        let new_dt = &this.inner - other_timespan.deref().inner;
+                    if let Some(other_timespan) = ud.borrow::<SealLock<TimeSpan>>() {
+                        let new_dt = &this.inner - other_timespan.deref().borrow().inner;
                         DateTime::from(new_dt).get_userdata(luau)
-                    } else if ud.is::<DateTime>() {
-                        // let other_dt = ud.borrow::<DateTime>().expect("impossible not DateTime");
+                    } else if let Some(_) = ud.borrow::<SealLock<DateTime>>() {
+                        // let other_dt = ud.borrow::<SealLock<DateTime>>().expect("impossible not DateTime");
                         wrap_err!("{}: adding DateTime - DateTime is ambiguous; if you need a TimeSpan between two DateTimes, use DateTime:since(dt: DateTime)", function_name)
-                    } else if ud.is::<TimeDuration>() {
+                    } else if let Some(_) = ud.borrow::<SealLock<TimeDuration>>() {
                         wrap_err!("{}: unfortunately we can't add DateTime + Duration directly, you need to use a TimeSpan (time.datetime.days(n))")
                     } else {
                         wrap_err!("{}: other must be a TimeSpan", function_name)
@@ -288,14 +286,13 @@ impl LuaUserData for DateTime {
             }
         });
 
-        methods.add_meta_method(LuaMetaMethod::Eq, |_luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_meta_method(LuaMetaMethod::Eq, |_luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime.__eq(self, other: DateTime)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<DateTime>() {
-                        let other_dt = ud.borrow::<DateTime>().expect("impossible not DateTime");
-                        Ok(LuaValue::Boolean(this.inner == other_dt.deref().inner))
-                    } else if ud.is::<TimeSpan>() {
+                    if let Some(other_dt) = ud.borrow::<SealLock<DateTime>>() {
+                        Ok(LuaValue::Boolean(this.inner == other_dt.deref().borrow().inner))
+                    } else if let Some(_) = ud.borrow::<SealLock<TimeSpan>>() {
                         wrap_err!("{}: DateTime == TimeSpan makes no sense to me lol", function_name)
                     } else {
                         wrap_err!("{}: other must be a DateTime", function_name)
@@ -307,14 +304,13 @@ impl LuaUserData for DateTime {
             }
         });
 
-        methods.add_meta_method(LuaMetaMethod::Lt, |_luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_meta_method(LuaMetaMethod::Lt, |_luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime.__lt(self, other: DateTime)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<DateTime>() {
-                        let other_dt = ud.borrow::<DateTime>().expect("impossible not DateTime");
-                        Ok(LuaValue::Boolean(this.inner < other_dt.deref().inner))
-                    } else if ud.is::<TimeSpan>() {
+                    if let Some(other_dt) = ud.borrow::<SealLock<DateTime>>() {
+                        Ok(LuaValue::Boolean(this.inner < other_dt.deref().borrow().inner))
+                    } else if let Some(_) = ud.borrow::<SealLock<TimeSpan>>() {
                         wrap_err!("{}: DateTime < TimeSpan makes no sense to me lol", function_name)
                     } else {
                         wrap_err!("{}: other must be a DateTime", function_name)
@@ -326,14 +322,13 @@ impl LuaUserData for DateTime {
             }
         });
 
-        methods.add_meta_method(LuaMetaMethod::Le, |_luau: &Lua, this: &DateTime, other: LuaValue| -> LuaValueResult {
+        methods.add_meta_method(LuaMetaMethod::Le, |_luau: &Lua, this, other: LuaValue| -> LuaValueResult {
             let function_name = "DateTime.__le(self, other: DateTime)";
             match other {
                 LuaValue::UserData(ud) => {
-                    if ud.is::<DateTime>() {
-                        let other_dt = ud.borrow::<DateTime>().expect("impossible not DateTime");
-                        Ok(LuaValue::Boolean(this.inner <= other_dt.deref().inner))
-                    } else if ud.is::<TimeSpan>() {
+                    if let Some(other_dt) = ud.borrow::<SealLock<DateTime>>() {
+                        Ok(LuaValue::Boolean(this.inner <= other_dt.deref().borrow().inner))
+                    } else if let Some(_) = ud.borrow::<SealLock<TimeSpan>>() {
                         wrap_err!("{}: DateTime <= TimeSpan makes no sense to me lol", function_name)
                     } else {
                         wrap_err!("{}: other must be a DateTime", function_name)
@@ -346,27 +341,27 @@ impl LuaUserData for DateTime {
         });
 
         // Mon, 18 Aug 2025 20:54:00 -0500
-        methods.add_method("rfc_2822", |luau: &Lua, this: &DateTime, _value: ()| {
+        methods.add_method("rfc_2822", |luau: &Lua, this, _value: ()| {
             ok_string(this.inner.strftime("%a, %d %b %Y %H:%M:%S %z").to_string(), luau)
         });
 
         // 2025-08-18T20:54:00-05:00
-        methods.add_method("rfc_3339", |luau: &Lua, this: &DateTime, _value: ()| {
+        methods.add_method("rfc_3339", |luau: &Lua, this, _value: ()| {
             ok_string(this.inner.strftime("%Y-%m-%dT%H:%M:%S%:z").to_string(), luau)
         });
 
         // 2025-08-18T20:54:00.000-05:00
-        methods.add_method("rfc_3339_opts", |luau: &Lua, this: &DateTime, _value: ()| {
+        methods.add_method("rfc_3339_opts", |luau: &Lua, this, _value: ()| {
             ok_string(this.inner.strftime("%Y-%m-%dT%H:%M:%S%.3f%:z").to_string(), luau)
         });
 
         // 2025-08-18T20:54:00-05:00
-        methods.add_method("iso_8601", |luau: &Lua, this: &DateTime, _value: ()| {
+        methods.add_method("iso_8601", |luau: &Lua, this, _value: ()| {
             ok_string(this.inner.strftime("%Y-%m-%dT%H:%M:%S%:z").to_string(), luau)
         });
 
         // Mon, 18 Aug 2025 20:54:00 GMT
-        methods.add_method("http_date", |luau: &Lua, this: &DateTime, _value: ()| {
+        methods.add_method("http_date", |luau: &Lua, this, _value: ()| {
             ok_string(this.inner.strftime("%a, %d %b %Y %H:%M:%S GMT").to_string(), luau)
         });
 
@@ -487,9 +482,8 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             };
             let relative_to = match multivalue.pop_front() {
                 Some(LuaValue::UserData(ud)) => {
-                    if ud.is::<DateTime>() {
-                        let dt = ud.borrow::<DateTime>().expect("impossible not DateTime");
-                        Some(dt.deref().clone())
+                    if let Some(dt) = ud.borrow::<SealLock<DateTime>>() {
+                        Some(dt.deref().borrow().clone())
                     } else {
                         let type_name = ud.type_name()?.unwrap_or_default();
                         return wrap_err!("{} expected relative_to to be a DateTime or nil/unspecified, got a userdata of type: {}", function_name, type_name);
@@ -513,9 +507,8 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
             };
             let relative_to = match multivalue.pop_front() {
                 Some(LuaValue::UserData(ud)) => {
-                    if ud.is::<DateTime>() {
-                        let dt = ud.borrow::<DateTime>().expect("impossible not DateTime");
-                        Some(dt.deref().clone())
+                    if let Some(dt) = ud.borrow::<SealLock<DateTime>>() {
+                        Some(dt.deref().borrow().clone())
                     } else {
                         let type_name = ud.type_name()?.unwrap_or_default();
                         return wrap_err!("{} expected relative_to to be a DateTime or nil/unspecified, got a userdata of type: {}", function_name, type_name);
