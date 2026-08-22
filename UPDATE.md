@@ -4,6 +4,10 @@ Most recent important updates to *seal*. Basically like a changelog, but less st
 
 This document will contain new features, breaking changes, etc.
 
+## 0.8.1
+
+- Implement support for `.config.luau` files; they may be used instead of a `.luaurc`.
+
 ## 0.8.0
 
 ### Breaking changes
