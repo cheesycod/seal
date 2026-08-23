@@ -148,7 +148,7 @@ impl SealCommand {
     // rest of the SealCommand impl defined at the bottom of main.rs
 }
 
-fn set_fflags(flags: [&'static str; 3]) -> LuaResult<()> {
+fn set_fflags<const N: usize>(flags: [&'static str; N]) -> LuaResult<()> {
     for flag in flags {
         if mluau::Lua::set_fflag(flag, true).is_err() {
             eputs!("[WARN] unable to enable Luau FFlag '{}'; was Luau updated and the flag removed?", flag)?;
@@ -171,11 +171,7 @@ fn main() -> LuaResult<()> {
 
     crate::std_io::input::EXPECT_OUTPUT_STREAMS.initialize_and_check();
 
-    set_fflags([
-        "DebugLuauUserDefinedClassesRuntime",
-        "DebugLuauUserDefinedClasses",
-        "LuauExportValueSyntax"
-    ])?;
+    set_fflags(["LuauExportValueSyntax"])?;
 
     let command = match SealCommand::parse(args) {
         Ok(command) => command,
