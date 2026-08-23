@@ -1,6 +1,6 @@
 use std::{borrow::Cow, cell::RefCell, sync::Arc};
 
-use crate::{prelude::*, std_io::format::pretty, userdata::{SealLock, SealUserData, SealUserDataFields, SealUserDataMethods}};
+use crate::{prelude::*, std_io::format::pretty};
 use mluau::{CallbackResult, FromLuaErr, prelude::*};
 use crate::err;
 
@@ -184,6 +184,7 @@ pub fn ecall(luau: &Lua, f: LuaFunction) -> LuaValueResult {
         None => None,
     };
     let result = luau.create_function_with_debug(move |_: &Lua, multivalue: LuaMultiValue| {
+        // intentionally uses call_with_err directly to better control error
         let result = match f.call_with_err::<LuaMultiValue, WrappedError>(multivalue) {
             Ok(result) => result,
             Err(e) => return LuaEither::Right(LuaCustomError(e.into_mut()))

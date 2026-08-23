@@ -1,5 +1,5 @@
 use mluau::prelude::*;
-use crate::std_err::{WrappedError, ecall};
+use crate::std_err::ecall;
 use crate::{globals::warn, prelude::*};
 use crate::std_io;
 
@@ -323,7 +323,7 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
         .build()?;
 
     let chunk = Chunk::src(PROMPT_DOT_LUAU_SRC);
-    let prompt_table = match luau.load(chunk).eval_with_err::<LuaTable, WrappedError>() {
+    let prompt_table = match luau.load(chunk).eval_wrapped::<LuaTable>() {
         Ok(t) => t,
         Err(err) => {
             panic!("std/io/prompt's prompt.luau did a bad: {}", err);

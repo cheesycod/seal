@@ -2,7 +2,6 @@ use mluau::prelude::*;
 use crate::prelude::*;
 
 use crate::globals::warn;
-use crate::std_err::WrappedError;
 use crate::std_terminal::events::Interrupt;
 use crate::userdata::SealLock;
 use rustyline::error::ReadlineError;

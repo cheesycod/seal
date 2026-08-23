@@ -4,7 +4,6 @@ use std::io::{self, Write};
 use std::process::{self, Command, Output};
 use std::rc::Rc;
 
-use crate::std_err::WrappedError;
 use crate::{prelude::*, std_err};
 use crate::std_env;
 use mluau::prelude::*;

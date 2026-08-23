@@ -3,7 +3,6 @@ use std::sync::Mutex;
 use std::thread;
 
 use crate::prelude::*;
-use crate::std_err::WrappedError;
 use crate::{std_json, globals, err};
 use crossbeam_channel::TrySendError;
 use mluau::prelude::*;

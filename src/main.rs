@@ -26,7 +26,6 @@
 // runtime case, so we ban the method outright via clippy.toml's disallowed-methods.
 #![warn(clippy::disallowed_methods, reason = "see clippy.toml for banned methods and why")]
 
-use crate::std_err::WrappedError;
 use crate::{prelude::*, setup::SetupOptions};
 use mluau::prelude::*;
 
@@ -216,9 +215,9 @@ fn main() -> LuaResult<()> {
         Err(err) => display_error_and_exit(err),
     };
 
-    match func.call_with_err::<(), WrappedError>(()) {
-        Ok(_) => Ok(()),
-        Err(err) => display_error_and_exit(LuaError::external(err.to_string())),
+    match func.call_wrapped(()) {
+        Ok(()) => Ok(()),
+        Err(err) => display_error_and_exit(err),
     }
 }
 
@@ -443,7 +442,7 @@ impl SealCommand {
                 return wrap_err!("help not yet implemented for command {:#?}", other);
             },
         })?;
-        puts!("{}", help_function.call_with_err::<String, WrappedError>(LuaNil).map_err(|x| LuaError::external(x.format_message_dirty().as_ref()))?)?;
+        puts!("{}", help_function.call_wrapped::<String>(LuaNil)?)?;
         Ok(None)
     }
     fn next_is_help(&self, args: &Args) -> bool {

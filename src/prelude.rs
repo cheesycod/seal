@@ -6,10 +6,21 @@ pub use mluau::ChunkSource as Chunk;
 /// constant must never be looser than luau's real MAXSIZE
 pub const MAX_TABLE_SIZE: usize = 1 << 26;
 
-use crate::userdata::{SealFunctionExt, SealLock, SealUserData, SealUserDataBorrowExt, SealUserDataExt};
+pub use crate::{
+    userdata::WrappedFunction as WrappedFunction,  // TODO: Consider removing it
+    userdata::SealLock as SealLock, // TODO: Replace with Borrowable
+    userdata::SealUserData as SealUserData,
+    userdata::SealUserDataBorrowExt as SealUserDataBorrowExt, // TODO: Replace with Borrowable
+    userdata::SealUserDataExt as SealUserDataExt,
+    userdata::SealUserDataFields as SealUserDataFields,
+    userdata::SealUserDataMethods as SealUserDataMethods,
+    userdata::CallWrapped as CallWrapped,
+    userdata::CallWrappedChunk as CallWrappedChunk
+};
+
 pub use crate::{
     std_io::colors as colors, wrap_err, table_helpers::TableBuilder,
-    put, puts, eput, eputs, signatures
+    put, puts, eput, eputs, signatures, std_err::WrappedError as WrappedError
 };
 
 pub type LuaValueResult = LuaResult<LuaValue>;
@@ -22,16 +33,16 @@ pub fn ok_table(t: LuaResult<LuaTable>) -> LuaValueResult {
 }
 
 pub fn ok_function(f: fn(&Lua, LuaValue) -> LuaValueResult, luau: &Lua) -> LuaValueResult {
-    Ok(LuaValue::Function(luau.create_seal_function(f)?))
+    Ok(LuaValue::Function(luau.create_wrapped_function(f)?))
 }
 
 // TODO: figure out how to get generics working for ok_function so we don't need multiple functions to do this
 pub fn ok_function_multi_returns_value(f: fn(&Lua, LuaMultiValue) -> LuaValueResult, luau: &Lua) -> LuaValueResult {
-    Ok(LuaValue::Function(luau.create_seal_function(f)?))
+    Ok(LuaValue::Function(luau.create_wrapped_function(f)?))
 }
 
 pub fn ok_function_multi_returns_multi(f: fn(&Lua, LuaMultiValue) -> LuaMultiResult, luau: &Lua) -> LuaValueResult {
-    Ok(LuaValue::Function(luau.create_seal_function(f)?))
+    Ok(LuaValue::Function(luau.create_wrapped_function(f)?))
 }
 
 pub fn ok_function_mut<F, I, Fn>(f: Fn, luau: &Lua) -> LuaValueResult

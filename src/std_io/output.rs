@@ -5,7 +5,6 @@ use crate::prelude::*;
 use mluau::prelude::*;
 
 use super::format;
-use crate::std_err::WrappedError;
 
 pub fn debug_print(luau: &Lua, multivalue: LuaMultiValue) -> LuaMultiResult {
     let function_name = "dp(...: any)";

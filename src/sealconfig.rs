@@ -3,7 +3,6 @@ use std::{fs, io};
 
 use crate::prelude::*;
 use crate::std_env;
-use crate::std_err::WrappedError;
 use crate::std_fs::validate_path;
 use mluau::prelude::*;
 
@@ -66,7 +65,9 @@ impl SealConfig {
         };
 
         let chunk = Chunk::src(sealconfig_src);
-        let sealconfig = match luau.load(chunk).eval_with_err::<LuaValue, WrappedError>() {
+
+        // NOTE: We use eval_with_err directly here to better control the err
+        let sealconfig = match luau.load(chunk).eval_wrapped::<LuaValue>() {
             Ok(LuaValue::Table(config)) => config,
             Ok(other) => {
                 return wrap_err!("{}: config.luau at '{}' returned something that isn't a table: {:?}", function_name, current_path.display(), other);

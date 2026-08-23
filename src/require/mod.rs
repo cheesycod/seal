@@ -1,4 +1,4 @@
-use crate::{std_err::WrappedError, *};
+use crate::*;
 use crate::std_fs::pathlib::normalize_path;
 use std::{fs, io};
 
@@ -44,10 +44,7 @@ pub fn require(luau: &Lua, path: LuaValue) -> LuaValueResult {
 
         let chunk = Chunk::src(src);
 
-        let value = match luau.load(chunk).set_name(&resolved_path).eval_with_err::<LuaValue, WrappedError>() {
-            Ok(v) => v,
-            Err(e) => return wrap_err!(e)
-        };
+        let value = luau.load(chunk).set_name(&resolved_path).eval_wrapped()?;
         
         require_cache.raw_set(resolved_path.clone(), &value)?;
 
@@ -173,10 +170,7 @@ fn get_standard_library(luau: &Lua, path: String) -> LuaValueResult {
 const STD_SEMVER_SRC: &str = include_str!("../std_semver.luau");
 fn load_std_semver(luau: &Lua) -> LuaResult<LuaTable> {
     let chunk = Chunk::src(STD_SEMVER_SRC);
-    match luau.load(chunk).set_name("std/semver").eval_with_err::<LuaTable, WrappedError>()  { // <<>> HACK
-        Ok(v) => Ok(v),
-        Err(e) => wrap_err!(e.format_message_dirty())
-    }
+    luau.load(chunk).set_name("std/semver").eval_wrapped()
 }
 
 const RESOLVER_SRC: &str = include_str!("./resolver.luau");
@@ -197,7 +191,7 @@ fn cached_resolver(luau: &Lua) -> LuaResult<LuaFunction> {
         // putting @@ makes mluau correctly display @seal/src/require/resolver.luau in stack traceback
         let LuaValue::Table(resolver) = luau.load(chunk).set_name("@@seal/src/require/resolver.luau").eval()? else {
             panic!("require resolver didnt return table??");
-        };
+        }; 
         let LuaValue::Function(resolve) = resolver.raw_get("resolve")? else {
             panic!("require resolver.resolve not a function??");
         };
@@ -210,7 +204,7 @@ fn cached_resolver(luau: &Lua) -> LuaResult<LuaFunction> {
 
 fn resolve_path(luau: &Lua, path: String) -> LuaResult<String> {
     let resolve = cached_resolver(luau)?;
-    match resolve.call_with_err::<LuaValue, WrappedError>(path.to_owned()) {
+    match resolve.call_wrapped(path.to_owned()) {
         Ok(LuaValue::Table(result_table)) => {
             if let LuaValue::String(path) = result_table.raw_get("path")? {
                 Ok(path.to_string_lossy())

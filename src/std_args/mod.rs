@@ -1,7 +1,7 @@
 use mluau::prelude::*;
 use crate::prelude::*;
 
-use crate::std_err::{WrappedError, ecall};
+use crate::std_err::ecall;
 
 const ARGS_DOT_LUAU: &str = include_str!("./args.luau");
 
@@ -11,7 +11,8 @@ pub fn create(luau: &Lua) -> LuaResult<LuaTable> {
         .build()?;
 
     let chunk = Chunk::src(ARGS_DOT_LUAU);
-    let prompt_table = match luau.load(chunk).eval_with_err::<LuaTable, WrappedError>() {
+
+    let prompt_table = match luau.load(chunk).eval_wrapped::<LuaTable>() {
         Ok(t) => t,
         Err(err) => {
             panic!("std/args' args.luau did a bad: {}", err);

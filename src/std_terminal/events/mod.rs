@@ -1,6 +1,5 @@
 use mluau::prelude::*;
 use crate::prelude::*;
-use crate::std_err::WrappedError;
 use crate::userdata::{SealLock, SealUserData, SealUserDataFields, SealUserDataMethods};
 
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseEvent};
@@ -336,10 +335,7 @@ fn interrupt_check(luau: &Lua, value: LuaValue) -> LuaValueResult {
     let function = if let Some(function) = luau.registry().get::<Option<LuaFunction>>("terminal/interrupt_check")? {
         function
     } else {
-        let function = match luau.load(INTERRUPT_CHECK_SRC).eval_with_err::<LuaFunction, WrappedError>() {
-            Ok(f) => f,
-            Err(e) => return wrap_err!(e)
-        };
+        let function = luau.load(INTERRUPT_CHECK_SRC).eval_wrapped::<LuaFunction>()?;
         luau.registry().set("terminal/interrupt_check", &function)?;
         function
     };

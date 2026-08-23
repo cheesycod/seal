@@ -6,8 +6,7 @@
 #![allow(dead_code)]
 
 use mluau::{FunctionMutExt, prelude::*};
-
-use crate::std_err::WrappedError;
+use crate::WrappedError; // avoid importing prelude here due to circular deps
 
 /**
     Utility struct for building Lua tables.

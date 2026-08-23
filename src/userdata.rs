@@ -1,7 +1,6 @@
 use std::{borrow::Cow, cell::RefCell, ffi::c_int};
 use mluau::{AnyUserData, CallbackResult, CustomError, FromLua, FromLuaMulti, Function, IntoCallbackResult, IntoLua, IntoLuaMulti, Lua, LuaUserDataExt, Ok as LuaOk, TypedUserData, USERDATA2_TAG, UserData, UserDataFields, UserDataMethods};
-
-use crate::std_err::WrappedError;
+use crate::WrappedError; // avoid importing prelude here due to circular deps
 
 pub struct SealLock<T>(pub RefCell<T>);
 
@@ -342,17 +341,16 @@ impl SealUserDataBorrowExt for AnyUserData {
     }
 }
 
-pub trait SealFunctionExt {
-    fn create_seal_function<A, R, F>(&self, func: F) -> mluau::Result<Function>
+pub trait WrappedFunction {
+    fn create_wrapped_function<A, R, F>(&self, func: F) -> mluau::Result<Function>
     where
         A: FromLuaMulti,
         R: IntoLuaMulti,
         F: Fn(&Lua, A) -> mluau::Result<R> + 'static;
-
 }
 
-impl SealFunctionExt for Lua {
-    fn create_seal_function<A, R, F>(&self, func: F) -> mluau::Result<Function>
+impl WrappedFunction for Lua {
+    fn create_wrapped_function<A, R, F>(&self, func: F) -> mluau::Result<Function>
     where
         A: FromLuaMulti,
         R: IntoLuaMulti,
@@ -366,3 +364,51 @@ impl SealFunctionExt for Lua {
     }
 }
 
+pub trait CallWrapped {
+    fn call_wrapped<R>(&self, args: impl IntoLuaMulti) -> mluau::Result<R> 
+    where
+        R: FromLuaMulti;
+}
+
+impl CallWrapped for mluau::Function {
+    fn call_wrapped<R>(&self, args: impl IntoLuaMulti) -> mluau::Result<R> 
+        where
+            R: FromLuaMulti 
+    {
+        match self.call_with_err::<R, WrappedError>(args) {
+            Ok(v) => Ok(v),
+            Err(e) => wrap_err!(e)
+        }
+    }
+}
+
+// needed bc Chunk call consumes the chunk
+pub trait CallWrappedChunk {
+    fn call_wrapped<R>(self, args: impl IntoLuaMulti) -> mluau::Result<R> 
+    where
+        R: FromLuaMulti;
+
+    fn eval_wrapped<R>(self) -> mluau::Result<R> 
+    where
+        R: FromLuaMulti;
+}
+
+impl<'a> CallWrappedChunk for mluau::Chunk<'a> {
+    fn call_wrapped<R>(self, args: impl IntoLuaMulti) -> mluau::Result<R> 
+        where
+            R: FromLuaMulti 
+    {
+        let func = self.into_function()?;
+        func.call_wrapped(args)
+    }
+
+    fn eval_wrapped<R>(self) -> mluau::Result<R> 
+    where
+        R: FromLuaMulti 
+    {
+        match self.eval_with_err::<R, WrappedError>() {
+            Ok(v) => Ok(v),
+            Err(e) => wrap_err!(e)
+        }
+    }
+}

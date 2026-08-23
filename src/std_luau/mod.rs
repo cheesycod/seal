@@ -1,6 +1,5 @@
 use mluau::prelude::*;
 use crate::prelude::*;
-use crate::std_err::WrappedError;
 use crate::userdata::SealUserDataExt;
 use std::path::PathBuf;
 use mluau::Compiler;
@@ -156,6 +155,7 @@ unsafe fn eval(luau: &Lua, src: Vec<u8>, eval_options: EvalOptions) -> LuaValueR
         .set_name(name)
         .set_environment(globals);
 
+    // NOTE: We use eval_with_err directly here to directly capture the err
     let res = match chunk.eval_with_err::<LuaValue, WrappedError>() {
         Ok(value) => value,
         Err(err) => {

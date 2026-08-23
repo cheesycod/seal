@@ -1,7 +1,6 @@
 use entry::{wrap_io_read_errors, wrap_io_read_errors_empty};
 use mluau::prelude::*;
 use crate::prelude::*;
-use crate::std_err::WrappedError;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 use copy_dir::copy_dir;
