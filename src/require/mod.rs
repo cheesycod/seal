@@ -194,7 +194,8 @@ fn cached_resolver(luau: &Lua) -> LuaResult<LuaFunction> {
         Ok(resolve)
     } else {
         let chunk = Chunk::src(RESOLVER_SRC);
-        let LuaValue::Table(resolver) = luau.load(chunk).eval()? else {
+        // putting @@ makes mluau correctly display @seal/src/require/resolver.luau in stack traceback
+        let LuaValue::Table(resolver) = luau.load(chunk).set_name("@@seal/src/require/resolver.luau").eval()? else {
             panic!("require resolver didnt return table??");
         };
         let LuaValue::Function(resolve) = resolver.raw_get("resolve")? else {
