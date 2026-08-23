@@ -27,9 +27,8 @@
 
 ## Android (Termux)
 
-1. Download an Android release artifact from the [latest release](<https://github.com/deviaze/seal/releases/latest>) or follow the Android instructions below.
-2. Build from source following the instructions below.
-3. Ping me on Discord if you're having trouble getting *seal* to work on Android.
+1. Download an Android release artifact from the [latest release](<https://github.com/deviaze/seal/releases/latest>) or follow the Android instructions below for building from source.
+2. Ping me on Discord if you're having trouble getting *seal* to work on Android.
 
 ## Building/installing from source
 
