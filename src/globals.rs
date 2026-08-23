@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use mluau::prelude::*;
 use crate::prelude::*;
-use crate::std_err::ecall;
+use crate::std_err::{WrappedError, ecall};
 use crate::userdata::SealFunctionExt;
 use crate::{require, std_io};
 
@@ -158,7 +158,10 @@ const SCRIPT_PATH_SRC: &str = r#"
 
 pub fn get_debug_name(luau: &Lua) -> LuaResult<String> {
     let chunk = Chunk::src(SCRIPT_PATH_SRC);
-    luau.load(chunk).eval::<String>()
+    match luau.load(chunk).eval_with_err::<String, WrappedError>() {
+        Ok(v) => Ok(v),
+        Err(e) => return wrap_err!(e)
+    }
 }
 
 pub fn get_script_path(luau: &Lua, _multivalue: LuaMultiValue) -> LuaValueResult {

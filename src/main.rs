@@ -445,7 +445,7 @@ impl SealCommand {
                 return wrap_err!("help not yet implemented for command {:#?}", other);
             },
         })?;
-        puts!("{}", help_function.call::<String>(LuaNil)?)?;
+        puts!("{}", help_function.call_with_err::<String, WrappedError>(LuaNil).map_err(|x| LuaError::external(x.format_message_dirty().as_ref()))?)?;
         Ok(None)
     }
     fn next_is_help(&self, args: &Args) -> bool {

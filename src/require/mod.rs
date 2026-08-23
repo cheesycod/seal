@@ -44,7 +44,10 @@ pub fn require(luau: &Lua, path: LuaValue) -> LuaValueResult {
 
         let chunk = Chunk::src(src);
 
-        let value = luau.load(chunk).set_name(&resolved_path).eval::<LuaValue>()?;
+        let value = match luau.load(chunk).set_name(&resolved_path).eval_with_err::<LuaValue, WrappedError>() {
+            Ok(v) => v,
+            Err(e) => return wrap_err!(e)
+        };
         
         require_cache.raw_set(resolved_path.clone(), &value)?;
 
@@ -170,7 +173,10 @@ fn get_standard_library(luau: &Lua, path: String) -> LuaValueResult {
 const STD_SEMVER_SRC: &str = include_str!("../std_semver.luau");
 fn load_std_semver(luau: &Lua) -> LuaResult<LuaTable> {
     let chunk = Chunk::src(STD_SEMVER_SRC);
-    luau.load(chunk).set_name("std/semver").eval::<LuaTable>() // <<>> HACK
+    match luau.load(chunk).set_name("std/semver").eval_with_err::<LuaTable, WrappedError>()  { // <<>> HACK
+        Ok(v) => Ok(v),
+        Err(e) => wrap_err!(e.format_message_dirty())
+    }
 }
 
 const RESOLVER_SRC: &str = include_str!("./resolver.luau");

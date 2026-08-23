@@ -36,7 +36,7 @@ pub fn setup_sigabrt_handler() {
     }
 }
 
-pub fn parse_traceback(raw_traceback: String) -> String {
+pub fn parse_traceback<T: IntoLua>(raw_traceback: T) -> String {
     let parse_traceback = include_str!("./scripts/parse_traceback.luau");
     let luau_for_traceback = Lua::new();
     if let Err(err) = globals::set_globals(&luau_for_traceback, String::default()) {
@@ -44,12 +44,12 @@ pub fn parse_traceback(raw_traceback: String) -> String {
     }
     match luau_for_traceback.load(parse_traceback).set_name("seal/src/err/parse_traceback.luau").eval() {
         Ok(LuaValue::Function(parse_traceback)) => {
-            match parse_traceback.call::<LuaValue>(raw_traceback) {
+            match parse_traceback.call_with_err::<LuaValue, WrappedError>(raw_traceback) {
                 Ok(LuaValue::String(s)) => s.to_string_lossy(),
-                Ok(LuaValue::UserData(ud)) => {
-                    match WrappedError::borrowed(ud) {
+                Ok(LuaValue::UserData(ref ud)) => {
+                    match WrappedError::as_borrowed(ud) {
                         Ok(err) => {
-                            panic!("parse_traceback.luau (error formatter) errored at runtime:\n\n{}", err.borrow().message());
+                            panic!("parse_traceback.luau (error formatter) errored at runtime:\n\n{}", err.borrow().format_message(&ud.weak_lua().upgrade()));
                         },
                         Err(name) => {
                             panic!("parse_traceback.luau should return string or return an error, got userdata of type: {}", name);
@@ -204,7 +204,6 @@ pub fn display_error_and_exit(err: LuaError) -> ! {
     std::process::exit(1);
 }
 
-// TODO: Switch this to returning a WrappedError directly
 #[macro_export]
 macro_rules! wrap_err {
     ($msg:expr) => {{

@@ -3,6 +3,7 @@ use std::ffi::OsString;
 
 use mluau::prelude::*;
 use crate::prelude::*;
+use crate::std_err::WrappedError;
 use crate::{globals, std_env};
 use crate::std_fs::validate_path;
 
@@ -88,7 +89,7 @@ pub fn run(options: SetupOptions) -> LuaEmptyResult {
     let temp_luau = Lua::default();
     globals::set_globals(&temp_luau, cwd.to_string_lossy())?;
     let chunk = Chunk::src(SETUP_SRC);
-    let setup_table = match temp_luau.load(chunk).set_name("seal setup").eval::<LuaValue>() {
+    let setup_table = match temp_luau.load(chunk).set_name("seal setup").eval_with_err::<LuaValue, WrappedError>() {
         Ok(t) => match t {
             LuaValue::Table(t) => t,
             other => {
@@ -107,12 +108,16 @@ pub fn run(options: SetupOptions) -> LuaEmptyResult {
         LuaValue::Function(f) => f,
         other => panic!("seal setup.luau's setup function not a function? got: {:?}", other),
     };
-    setup_function.call::<()>(match options {
+    if let Err(e) = setup_function.call_with_err::<(), WrappedError>(match options {
         SetupOptions::Default => defaults_table.raw_get("default")?,
         SetupOptions::Project => defaults_table.raw_get("project")?,
         SetupOptions::Script => defaults_table.raw_get("script")?,
         SetupOptions::Custom => LuaNil,
-    })
+    }) {
+        wrap_err!(e.format_message_dirty())
+    } else {
+        Ok(())
+    }
 }
 
 pub fn regen() -> LuaEmptyResult {
@@ -120,7 +125,7 @@ pub fn regen() -> LuaEmptyResult {
     let temp_luau = Lua::default();
     globals::set_globals(&temp_luau, cwd.to_string_lossy())?;
     let chunk = Chunk::src(REGEN_SRC);
-    if let Err(err) = temp_luau.load(chunk).set_name("seal regen").exec() {
+    if let Err(err) = temp_luau.load(chunk).set_name("seal regen").call_with_err::<(), WrappedError>(()) {
         return wrap_err!("seal regen: {}", err);
     }
     Ok(())

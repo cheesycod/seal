@@ -113,7 +113,7 @@ pub fn bundle(project_path: &Path) -> LuaResult<String> {
     globals::set_globals(&luau, "bundler")?;
     
     let chunk = Chunk::src(BUNDLER_SRC);
-    let bundle = match luau.load(chunk).set_name("bundle.luau").eval::<LuaFunction>() {
+    let bundle = match luau.load(chunk).set_name("bundle.luau").eval_with_err::<LuaFunction, WrappedError>() {
         Ok(bundle) => bundle,
         Err(err) => {
             panic!("loading seal bundle function broke due to err: {}", err);

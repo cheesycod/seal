@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use mluau::prelude::*;
 use crate::prelude::*;
+use crate::std_err::WrappedError;
 use crate::std_fs::{self, entry::{self, wrap_io_read_errors, get_path_from_entry}};
 use super::pathlib::{normalize_path, path_join};
 use super::validate_path;
@@ -24,10 +25,13 @@ pub fn listdir(luau: &Lua, dir_path: String, mut multivalue: LuaMultiValue, func
         }
     };
     fn check_filter(luau: &Lua, filter_fn: &LuaFunction, list_path: &str, function_name: &str) -> LuaResult<bool> {
-        match filter_fn.call::<LuaValue>(list_path.into_lua(luau)?)? {
-            LuaValue::Boolean(b) => Ok(b),
-            other => {
+        match filter_fn.call_with_err::<LuaValue, WrappedError>(list_path.into_lua(luau)?) {
+            Ok(LuaValue::Boolean(b)) => Ok(b),
+            Ok(other) => {
                 wrap_err!("{} expected filter function to return a boolean, got: {:?}", function_name, other)
+            },
+            Err(e) => {
+                wrap_err!(e.format_message(luau))
             }
         }
     }

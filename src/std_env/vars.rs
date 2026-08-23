@@ -1,7 +1,7 @@
 use std::env::VarError;
 
 use mluau::prelude::*;
-use crate::{prelude::*, std_fs::validate_path};
+use crate::{prelude::*, std_err::WrappedError, std_fs::validate_path};
 
 enum MaybeDotenv {
     ExplicitTrue,
@@ -156,7 +156,10 @@ fn vars_validate(luau: &Lua, mut multivalue: LuaMultiValue) -> LuaValueResult {
         None => LuaNil,
     };
 
-    let result = callback.call::<LuaValue>(arg)?;
+    let result = match callback.call_with_err::<LuaValue, WrappedError>(arg) {
+        Ok(v) => v,
+        Err(e) => return wrap_err!(e)
+    };
 
     Ok(result)
 }

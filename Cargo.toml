@@ -97,7 +97,7 @@ bstr = "1.12.3"
 # my custom fork of archive crate with huge featureset and safety improvements
 # including writing archives and dealing with unsafe path traversals, also fixes
 # a number of bugs in how it handled protecting against archive bombs in some formats
-archive = { git = "https://github.com/deviaze/archive.git", branch = "safer", version = "0.4.0" }
+archive = { git = "https://github.com/deviaze/archive.git", branch = "safer" }
 # compile time macro makes archive much more DRY
 pastey = "0.2.3"
 

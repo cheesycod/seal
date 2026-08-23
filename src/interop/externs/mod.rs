@@ -103,7 +103,7 @@ pub fn extern_load(luau: &Lua, path: String) -> LuaValueResult {
     if let LuaValue::UserData(ref ud) = returned_value
         && let Some(err) = ud.borrow::<SealLock<crate::std_err::WrappedError>>()
     {
-        return wrap_err!("{}: dynamic library at '{}' errored during initialization:\n{}", function_name, &path, err.borrow().message());
+        return wrap_err!("{}: dynamic library at '{}' errored during initialization:\n{}", function_name, &path, err.borrow().format_message_dirty());
     }
 
     Ok(returned_value)

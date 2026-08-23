@@ -6,7 +6,7 @@ pub use mluau::ChunkSource as Chunk;
 /// constant must never be looser than luau's real MAXSIZE
 pub const MAX_TABLE_SIZE: usize = 1 << 26;
 
-use crate::userdata::{SealLock, SealUserData, SealUserDataBorrowExt, SealUserDataExt};
+use crate::userdata::{SealFunctionExt, SealLock, SealUserData, SealUserDataBorrowExt, SealUserDataExt};
 pub use crate::{
     std_io::colors as colors, wrap_err, table_helpers::TableBuilder,
     put, puts, eput, eputs, signatures
@@ -22,16 +22,16 @@ pub fn ok_table(t: LuaResult<LuaTable>) -> LuaValueResult {
 }
 
 pub fn ok_function(f: fn(&Lua, LuaValue) -> LuaValueResult, luau: &Lua) -> LuaValueResult {
-    Ok(LuaValue::Function(luau.create_function(f)?))
+    Ok(LuaValue::Function(luau.create_seal_function(f)?))
 }
 
 // TODO: figure out how to get generics working for ok_function so we don't need multiple functions to do this
 pub fn ok_function_multi_returns_value(f: fn(&Lua, LuaMultiValue) -> LuaValueResult, luau: &Lua) -> LuaValueResult {
-    Ok(LuaValue::Function(luau.create_function(f)?))
+    Ok(LuaValue::Function(luau.create_seal_function(f)?))
 }
 
 pub fn ok_function_multi_returns_multi(f: fn(&Lua, LuaMultiValue) -> LuaMultiResult, luau: &Lua) -> LuaValueResult {
-    Ok(LuaValue::Function(luau.create_function(f)?))
+    Ok(LuaValue::Function(luau.create_seal_function(f)?))
 }
 
 pub fn ok_function_mut<F, I, Fn>(f: Fn, luau: &Lua) -> LuaValueResult
@@ -48,7 +48,10 @@ pub fn ok_string<S: AsRef<[u8]>>(s: S, luau: &Lua) -> LuaValueResult {
 }
 
 pub fn ok_buffy(b: Vec<u8>, luau: &Lua) -> LuaValueResult {
-    Ok(LuaValue::Buffer(luau.create_external_buffer_mut(b)?))
+    println!("b is: {b:?}, len: {}", b.len());
+    let b = luau.create_external_buffer_mut(b)?;
+    b.with_bytes(|x| println!("buf with_bytes: {x:?}"));
+    Ok(LuaValue::Buffer(b))
 }
 
 pub fn ok_userdata_mut<S: SealUserData + 'static>(u: S, luau: &Lua) -> LuaValueResult {

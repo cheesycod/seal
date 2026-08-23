@@ -336,19 +336,22 @@ fn interrupt_check(luau: &Lua, value: LuaValue) -> LuaValueResult {
     let function = if let Some(function) = luau.registry().get::<Option<LuaFunction>>("terminal/interrupt_check")? {
         function
     } else {
-        let function = luau.load(INTERRUPT_CHECK_SRC).eval::<LuaFunction>()?;
+        let function = match luau.load(INTERRUPT_CHECK_SRC).eval_with_err::<LuaFunction, WrappedError>() {
+            Ok(f) => f,
+            Err(e) => return wrap_err!(e)
+        };
         luau.registry().set("terminal/interrupt_check", &function)?;
         function
     };
 
-    let interrupt = match function.call::<LuaValue>(value) {
+    let interrupt = match function.call_with_err::<LuaValue, WrappedError>(value) {
         Ok(LuaValue::Boolean(b)) if b => Interrupt::ctrlc(),
         Ok(LuaValue::Boolean(b)) if !b => Interrupt::ctrld(),
         Ok(LuaNil) => {
             return Ok(LuaNil);
         },
         Ok(LuaValue::UserData(ref ud)) if let Some(err) = ud.borrow::<SealLock<WrappedError>>() => {
-            return wrap_err!("{}: {}", function_name, err.borrow().format());
+            return wrap_err!("{}: {}", function_name, err.borrow().format_from_ud(ud));
         },
         Ok(other) => {
             panic!("{} returned an unexpected type of value: {:?}", function_name, other);
